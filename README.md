@@ -1,11 +1,11 @@
-# 🏨 Hotel Check-in Data Scraper — Complete Learning Project
+#  Hotel Check-in Data Scraper — Complete Learning Project
 
 > **Educational Purpose Only** — Respects robots.txt, rate limits, and site ToS.
 > This project is designed to teach web scraping architecture, not to bypass protections.
 
 ---
 
-## 🧭 Mind Map — Beginner → Production
+##  Mind Map — Beginner → Production
 
 ```
                     ┌─────────────────────────────────────────────────────────────┐
@@ -46,7 +46,7 @@
 
 ---
 
-## 📂 Project Structure
+##  Project Structure
 
 ```
 hotel-scraper/
@@ -136,7 +136,7 @@ hotel-scraper/
 
 ---
 
-## 🏗️ Architecture Overview
+##  Architecture Overview
 
 ```
 ┌─────────┐   ┌──────────┐   ┌──────────┐   ┌───────────┐
@@ -159,7 +159,7 @@ hotel-scraper/
 
 ---
 
-## 🐍 Python Libraries Used
+##  Python Libraries Used
 
 | Library            | Purpose                         | Level       |
 |--------------------|----------------------------------|-------------|
@@ -182,7 +182,7 @@ hotel-scraper/
 
 ---
 
-## 📊 Data Model: Hotel Check-ins
+##  Data Model: Hotel Check-ins
 
 ```python
 class HotelCheckin(BaseModel):
@@ -205,7 +205,7 @@ class HotelCheckin(BaseModel):
 
 ---
 
-## 🧪 Testing Strategy
+##  Testing Strategy
 
 | Test Type          | What It Covers                         | Tools                 |
 |--------------------|----------------------------------------|-----------------------|
@@ -218,7 +218,7 @@ class HotelCheckin(BaseModel):
 
 ---
 
-## 🚀 Getting Started
+##  Getting Started
 
 ```bash
 # Clone & setup
@@ -244,7 +244,7 @@ bash scripts/run_all.sh
 
 ---
 
-## ⚖️ Legal & Ethical Notes
+##  Legal & Ethical Notes
 
 This project is for **educational purposes only**. Before scraping any site:
 
@@ -256,19 +256,3 @@ This project is for **educational purposes only**. Before scraping any site:
 6. ❌ **Don't republish** scraped data without permission
 7. ❌ **Don't use for commercial purposes** without license
 
-> 💡 **Pro Tip:** For Booking.com/Agoda/Expedia, always check if their **official API** meets your needs first. APIs are free for affiliates and avoid all legal/technical headaches.
-
----
-
-## 📈 Learning Path
-
-```
-WEEK 1 ──► requests + BS4 → scrape SLTDA → save CSV
-WEEK 2 ──► Handle pagination → Parse hotel pages → Error handling
-WEEK 3 ──► Add Playwright → Handle JS content → Proxy rotation
-WEEK 4 ──► Rate limiting → Retry logic → Logging → Config files
-WEEK 5 ──► Async scraping → Database storage → Data validation
-WEEK 6 ──► Testing (unit + integration) → CI pipeline
-WEEK 7 ──► Docker → Monitoring → Scheduling
-WEEK 8 ──► Production tuning → API layer → Documentation
-```
