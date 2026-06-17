@@ -1,0 +1,101 @@
+version: '3.8'
+
+services:
+  # --- Database (PostgreSQL) ---
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: scraper
+      POSTGRES_PASSWORD: scraper_password
+      POSTGRES_DB: hotel_scraper
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scraper"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # --- Redis (for caching & queues) ---
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  # --- Scraper Application ---
+  scraper:
+    build: .
+    environment:
+      - DATABASE_URL=postgresql://scraper:scraper_password@db:5432/hotel_scraper
+      - REDIS_URL=redis://redis:6379/0
+      - ENV=production
+      - LOG_LEVEL=INFO
+      - RATE_LIMIT_PER_SECOND=0.5
+      - PROXY_ROTATION=false
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    command: >
+      python -m src.main schedule
+      --interval 24
+      --sources booking,agoda,sltda,datagovlk
+      --cities Colombo,Kandy,Galle
+
+  # --- API Server ---
+  api:
+    build: .
+    environment:
+      - DATABASE_URL=postgresql://scraper:scraper_password@db:5432/hotel_scraper
+      - ENV=production
+      - LOG_LEVEL=INFO
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      uvicorn src.api.main:app
+      --host 0.0.0.0
+      --port 8000
+      --workers 2
+
+  # --- Prometheus (Monitoring) ---
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+
+  # --- Grafana (Dashboards) ---
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+
+volumes:
+  postgres_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:

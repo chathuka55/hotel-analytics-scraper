@@ -1,0 +1,84 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# --- Virtual Environment ---
+venv/
+ENV/
+env/
+.venv/
+
+# --- IDEs ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- Environment Files ---
+.env
+!.env.example
+
+# --- Database ---
+*.db
+*.sqlite
+*.sqlite3
+
+# --- Data (raw scraped data) ---
+data/raw/*.csv
+data/raw/*.json
+data/raw/*.parquet
+data/processed/*.csv
+data/processed/*.json
+data/processed/*.parquet
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# --- Logs ---
+logs/
+*.log
+
+# --- Playwright ---
+.playwright-browsers/
+
+# --- Coverage ---
+.coverage
+htmlcov/
+.tox/
+.nox/
+.pytest_cache/
+
+# --- MyPy ---
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# --- Ruff ---
+.ruff_cache/
+
+# --- Docker ---
+.dockerignore
+
+# --- OS ---
+.DS_Store
+Thumbs.db

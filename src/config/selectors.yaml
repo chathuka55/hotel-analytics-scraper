@@ -1,0 +1,104 @@
+# ============================================================
+# CSS / XPath Selectors for Hotel Scraper
+# Update these when website layouts change
+# ============================================================
+
+# --- Booking.com Selectors ---
+booking:
+  # Search results page
+  search_result_item: "div[data-testid='property-card']"
+  hotel_name: "div[data-testid='title']"
+  hotel_url: "a[data-testid='title-link']"
+  hotel_rating: "div[data-testid='review-score']"
+  hotel_score: "div[data-testid='review-score'] div"
+  hotel_review_count: "div[data-testid='review-score'] abbr"
+  hotel_price: "span[data-testid='price-and-discounted-price']"
+  hotel_location: "span[data-testid='address']"
+  hotel_image: "img[data-testid='image']"
+  hotel_availability: "div[data-testid='availability-cta']"
+  next_page_button: "button[aria-label='Next page']"
+  no_results: "div[data-testid='no-results']"
+
+  # Hotel detail page
+  detail_hotel_name: "h2.pp-header__title"
+  detail_address: "span.hp_address_subtitle"
+  detail_rooms: "select.hprt-nos-select"
+  detail_facilities: "div.facilitiesChecklistSection"
+  detail_description: "div.hp_desc_important_facilities"
+  detail_coordinates: "a#hotel_address"
+
+# --- Agoda.com Selectors ---
+agoda:
+  # Search results page
+  search_result_item: "li.PropertyCard"
+  hotel_name: "h3.sc-jrAGrp"
+  hotel_url: "a.PropertyCard__Link"
+  hotel_rating: "div.sc-gkCoMD"
+  hotel_score: "div.sc-gkCoMD span"
+  hotel_review_count: "div.sc-gkCoMD span:last-child"
+  hotel_price: "span.sc-dWOrae"
+  hotel_location: "span.sc-iBPRYJ"
+  hotel_image: "img.sc-kEqXSa"
+  hotel_badge: "div.sc-bdnxRM"
+  next_page_button: "button[aria-label='Next']"
+
+  # Hotel detail page
+  detail_hotel_name: "h1[data-selenium='hotel-header-name']"
+  detail_address: "p[data-selenium='hotel-address-map']"
+  detail_rating: "div[data-selenium='reviews-score']"
+
+# --- Expedia.com Selectors ---
+expedia:
+  # Search results page
+  search_result_item: "div.uitk-card"
+  hotel_name: "h3.uitk-heading"
+  hotel_url: "a.uitk-card-link"
+  hotel_rating: "span.uitk-badge"
+  hotel_score: "span.uitk-text.has-text-theme"
+  hotel_review_count: "span.uitk-text.uitk-type-300"
+  hotel_price: "div.uitk-text.has-text-theme-economy"
+  hotel_location: "div.uitk-text.uitk-type-300.uitk-text-default-theme"
+  hotel_image: "img.uitk-image-media"
+  hotel_urgency: "div.uitk-phasing-indicator"
+  next_page_button: "button[aria-label='Go to the next page']"
+
+  # Hotel detail page
+  detail_hotel_name: "h1.uitk-heading"
+  detail_address: "div.uitk-text[data-testid='property-address']"
+
+# --- SLTDA (Sri Lanka Tourism) Selectors ---
+# Note: Government sites often use simpler HTML structures
+sltda:
+  # Main tourism statistics page
+  stats_table: "table"
+  stats_table_row: "table tr"
+  stats_table_header: "table th"
+  stats_table_cell: "table td"
+  report_link: "a[href*='report']"
+  report_link_pdf: "a[href$='.pdf']"
+  report_link_excel: "a[href$='.xlsx'], a[href$='.xls']"
+  monthly_stats: "div.statistics-section"
+  hotel_arrivals: "td.arrivals"
+  hotel_nights: "td.nights"
+  hotel_occupancy: "td.occupancy"
+  year_selector: "select#year"
+  month_selector: "select#month"
+
+# --- data.gov.lk Selectors ---
+datagovlk:
+  # CKAN-based data portal
+  dataset_list: "ul.dataset-list li.dataset-item"
+  dataset_title: "h3.dataset-heading a"
+  dataset_url: "h3.dataset-heading a"
+  dataset_description: "div.dataset-content div"
+  dataset_tags: "ul.dataset-tags li"
+  dataset_format: "span.format-label"
+  dataset_download: "a.resource-url-analytics"
+  search_input: "input[name='q']"
+  search_button: "button[type='submit']"
+  pagination_next: "a[rel='next']"
+
+  # Dataset detail page
+  resource_table: "table.resources"
+  resource_download: "a.resource-url-analytics"
+  api_endpoint: "a.endpoint-link"
