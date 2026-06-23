@@ -98,6 +98,7 @@ class APISettings(BaseSettings):
     api_host: str = "0.0.0.0"
     api_port: int = Field(default=8000, ge=1024, le=65535)
     api_workers: int = Field(default=1, ge=1, le=16)
+    frontend_origin: str = "http://localhost:5173"
 
 
 class Settings(BaseSettings):
