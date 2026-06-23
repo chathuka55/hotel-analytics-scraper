@@ -224,7 +224,8 @@ class BookingScraper(BaseScraper):
             return False
         return bool(next_btn)
 
-    def get_popular_cities_sri_lanka(self) -> List[str]:
+    @staticmethod
+    def get_popular_cities_sri_lanka() -> List[str]:
         """Get list of popular Sri Lankan cities to scrape.
 
         Returns:

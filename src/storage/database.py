@@ -177,6 +177,7 @@ class DatabaseStorage(BaseStorage):
         city: Optional[str] = None,
         checkin_date: Optional[date] = None,
         limit: Optional[int] = None,
+        offset: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
         """Load records with filtering."""
         session = self.get_session()
@@ -198,11 +199,45 @@ class DatabaseStorage(BaseStorage):
 
             query = query.order_by(HotelCheckinRecord.scraped_at.desc())
 
+            if offset:
+                query = query.offset(offset)
             if limit:
                 query = query.limit(limit)
 
             records = query.all()
             return [r.to_dict() for r in records]
+
+        finally:
+            session.close()
+
+    def count(
+        self,
+        source: Optional[str] = None,
+        city: Optional[str] = None,
+    ) -> int:
+        """Count records matching the given filters.
+
+        Args:
+            source: Filter by source
+            city: Filter by city
+
+        Returns:
+            Number of matching records
+        """
+        session = self.get_session()
+        try:
+            query = session.query(func.count(HotelCheckinRecord.id))
+
+            if source:
+                query = query.filter(
+                    HotelCheckinRecord.source == source.lower()
+                )
+            if city:
+                query = query.filter(
+                    func.lower(HotelCheckinRecord.city) == city.lower()
+                )
+
+            return query.scalar() or 0
 
         finally:
             session.close()
@@ -385,6 +420,35 @@ class DatabaseStorage(BaseStorage):
                 log.completed_at = datetime.utcnow()
                 log.duration_seconds = duration
                 session.commit()
+        finally:
+            session.close()
+
+    def get_scrape_log(self, log_id: int) -> Optional[Dict[str, Any]]:
+        """Get a single scrape log entry by id.
+
+        Args:
+            log_id: Scrape log entry id
+
+        Returns:
+            Log entry dict, or None if not found
+        """
+        session = self.get_session()
+        try:
+            log = session.query(ScrapeLog).filter(ScrapeLog.id == log_id).first()
+            if not log:
+                return None
+
+            return {
+                "id": log.id,
+                "source": log.source,
+                "city": log.city,
+                "status": log.status,
+                "records_scraped": log.records_scraped,
+                "error_message": log.error_message,
+                "started_at": log.started_at.isoformat() if log.started_at else None,
+                "completed_at": log.completed_at.isoformat() if log.completed_at else None,
+                "duration_seconds": log.duration_seconds,
+            }
         finally:
             session.close()
 
