@@ -71,10 +71,8 @@ class BaseScraper(ABC):
         self._error_count = 0
         self._start_time: Optional[datetime] = None
 
-    @property
-    def base_url(self) -> str:
-        """Get the base URL for this source."""
-        return self.settings.get_source_url(self.source)
+        # Subclasses override this with their source-specific base URL.
+        self.base_url: str = self.settings.get_source_url(self.source)
 
     @abstractmethod
     def build_search_url(
