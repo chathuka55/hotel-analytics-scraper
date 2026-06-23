@@ -3,21 +3,14 @@
 
 import sys
 import time
-from datetime import date, datetime, timedelta
-from typing import Optional
+from datetime import datetime, timedelta
 
 import click
 
 from src.config.settings import get_settings
 from src.monitoring.logger import configure_logging, get_logger
 from src.monitoring.metrics import get_metrics
-from src.scrapers import (
-    AgodaScraper,
-    BookingScraper,
-    DataGovLkScraper,
-    ExpediaScraper,
-    SLTDAScraper,
-)
+from src.scrapers.runner import run_source_scrape
 from src.storage import CSVStorage, DatabaseStorage, JSONStorage, init_db
 from src.utils.proxies import ProxyRotator
 
@@ -157,7 +150,7 @@ def scrape(
     for src in sources_to_scrape:
         logger.info(f"=== Scraping {src} ===")
         try:
-            results = _scrape_source(
+            results = run_source_scrape(
                 src,
                 storage,
                 proxy,
@@ -184,82 +177,6 @@ def scrape(
         f"Total records: {total_results}\n"
         f"Duration: {duration:.1f}s"
     )
-
-
-def _scrape_source(
-    source: str,
-    storage,
-    proxy,
-    city: str,
-    checkin: Optional[date],
-    checkout: Optional[date],
-    max_pages: int,
-    use_playwright: Optional[bool],
-    year: Optional[int],
-    month: Optional[int],
-) -> list:
-    """Scrape a single source."""
-
-    if source == "booking":
-        scraper = BookingScraper(storage=storage, proxy_rotator=proxy)
-        pw = use_playwright if use_playwright is not None else False
-
-        if year and month:
-            return scraper.scrape_with_monthly_dates(
-                city=city, year=year, month=month, max_pages=max_pages
-            )
-        elif checkin and checkout:
-            return scraper.scrape(
-                city=city,
-                checkin_date=checkin,
-                checkout_date=checkout,
-                max_pages=max_pages,
-                use_playwright=pw,
-            )
-
-    elif source == "agoda":
-        scraper = AgodaScraper(storage=storage, proxy_rotator=proxy)
-        pw = use_playwright if use_playwright is not None else True
-
-        if year and month:
-            return scraper.scrape_with_monthly_dates(
-                city=city, year=year, month=month, max_pages=max_pages
-            )
-        elif checkin and checkout:
-            return scraper.scrape(
-                city=city,
-                checkin_date=checkin,
-                checkout_date=checkout,
-                max_pages=max_pages,
-                use_playwright=pw,
-            )
-
-    elif source == "expedia":
-        scraper = ExpediaScraper(storage=storage, proxy_rotator=proxy)
-        pw = use_playwright if use_playwright is not None else True
-
-        if year and month:
-            return scraper.scrape_with_monthly_dates(
-                city=city, year=year, month=month, max_pages=max_pages
-            )
-        elif checkin and checkout:
-            return scraper.scrape(
-                city=city,
-                checkin_date=checkin,
-                checkout_date=checkout,
-                max_pages=max_pages,
-                use_playwright=pw,
-            )
-
-    elif source == "sltda":
-        scraper = SLTDAScraper(storage=storage, proxy_rotator=proxy)
-        return scraper.scrape(year=year, month=month)
-
-    elif source == "datagovlk":
-        scraper = DataGovLkScraper(storage=storage, proxy_rotator=proxy)
-        return scraper.scrape()
-
-    return []
 
 
 # --- Analytics Commands ---
