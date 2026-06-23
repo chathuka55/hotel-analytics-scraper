@@ -5,7 +5,7 @@ import random
 import time
 from collections import deque
 from contextlib import asynccontextmanager, contextmanager
-from threading import Lock
+from threading import RLock
 from typing import Optional
 
 
@@ -38,7 +38,7 @@ class RateLimiter:
         # Token bucket state
         self._tokens = float(self._burst)
         self._last_update = time.time()
-        self._lock = Lock()
+        self._lock = RLock()
 
         # Request history for adaptive limiting
         self._request_times: deque[float] = deque(maxlen=100)
