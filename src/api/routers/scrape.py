@@ -7,6 +7,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 
 from src.api.deps import get_storage
 from src.api.schemas import ScrapeJobAccepted, ScrapeJobStatus, ScrapeRequest
+from src.config.sources_registry import VALID_SOURCES
 from src.monitoring.logger import get_logger
 from src.scrapers.runner import run_source_scrape
 from src.storage.database import DatabaseStorage
@@ -69,8 +70,7 @@ def trigger_scrape(
     storage: DatabaseStorage = Depends(get_storage),
 ):
     """Start a scrape job in the background and return its log id immediately."""
-    valid_sources = {"booking", "agoda", "expedia", "sltda", "datagovlk"}
-    if request.source not in valid_sources:
+    if request.source not in VALID_SOURCES:
         raise HTTPException(status_code=400, detail=f"Unknown source: {request.source}")
 
     log_id = storage.log_scrape_start(request.source, request.city)

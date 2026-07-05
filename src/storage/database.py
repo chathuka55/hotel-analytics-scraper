@@ -21,6 +21,8 @@ from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 from src.config.settings import get_settings
 from src.monitoring.logger import get_logger
 from src.storage.base import BaseStorage
+from src.utils.location import get_city_match_values, normalize_city
+from src.utils.validators import filter_scraped_records, is_junk_record, JUNK_HOTEL_NAMES
 
 logger = get_logger(__name__)
 
@@ -58,6 +60,10 @@ class HotelCheckinRecord(Base):
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert record to dictionary."""
+        address = ""
+        if self.raw_data and isinstance(self.raw_data, dict):
+            address = self.raw_data.get("address", "") or ""
+
         return {
             "id": self.id,
             "hotel_name": self.hotel_name,
@@ -75,6 +81,7 @@ class HotelCheckinRecord(Base):
             "review_count": self.review_count,
             "scraped_at": self.scraped_at.isoformat() if self.scraped_at else None,
             "url": self.url,
+            "address": address,
             "raw_data": self.raw_data,
         }
 
@@ -130,6 +137,61 @@ class DatabaseStorage(BaseStorage):
         Base.metadata.create_all(bind=self.engine)
         logger.info(f"Database storage initialized: {self.database_url}")
 
+    @staticmethod
+    def _record_to_dict(record: HotelCheckinRecord) -> Dict[str, Any]:
+        """Merge ORM row with raw_data for junk checks."""
+        data = record.to_dict()
+        if record.raw_data and isinstance(record.raw_data, dict):
+            data.update(record.raw_data)
+        return data
+
+    @staticmethod
+    def _quality_filter(query):
+        """Exclude unknown/incomplete rows from hotel analytics queries."""
+        junk_names = [n for n in JUNK_HOTEL_NAMES if n]
+        query = query.filter(
+            ~func.lower(HotelCheckinRecord.hotel_name).in_(junk_names),
+            HotelCheckinRecord.city != "",
+            ~func.lower(HotelCheckinRecord.city).in_(junk_names),
+            HotelCheckinRecord.source != "unknown",
+            HotelCheckinRecord.source != "datagovlk",
+        )
+        return query
+
+    def _apply_hotel_filters(self, query, city: Optional[str] = None):
+        """Apply quality + city filters to a HotelCheckinRecord query."""
+        query = self._quality_filter(query)
+        return self._apply_city_filter(query, city)
+
+    def _apply_city_filter(self, query, city: Optional[str]):
+        """Filter by city including known aliases (e.g. Colombo City)."""
+        if not city:
+            return query
+        variants = [v.lower() for v in get_city_match_values(city)]
+        if not variants:
+            return query.filter(
+                func.lower(HotelCheckinRecord.city) == city.lower()
+            )
+        return query.filter(
+            func.lower(HotelCheckinRecord.city).in_(variants)
+        )
+
+    def purge_unknown_records(self) -> int:
+        """Delete junk/unknown records already stored in the database."""
+        session = self.get_session()
+        try:
+            records = session.query(HotelCheckinRecord).all()
+            count = 0
+            for record in records:
+                if is_junk_record(self._record_to_dict(record)):
+                    session.delete(record)
+                    count += 1
+            session.commit()
+            logger.info(f"Purged {count} unknown/junk records")
+            return count
+        finally:
+            session.close()
+
     def get_session(self) -> Session:
         """Get a new database session."""
         return self.SessionLocal()
@@ -146,11 +208,17 @@ class DatabaseStorage(BaseStorage):
         if not records:
             return 0
 
+        records = filter_scraped_records(records)
+        if not records:
+            return 0
+
         session = self.get_session()
         saved = 0
 
         try:
             for record in records:
+                if is_junk_record(record):
+                    continue
                 try:
                     db_record = self._dict_to_record(record)
                     session.add(db_record)
@@ -182,16 +250,13 @@ class DatabaseStorage(BaseStorage):
         """Load records with filtering."""
         session = self.get_session()
         try:
-            query = session.query(HotelCheckinRecord)
+            query = self._quality_filter(session.query(HotelCheckinRecord))
 
             if source:
                 query = query.filter(
                     HotelCheckinRecord.source == source.lower()
                 )
-            if city:
-                query = query.filter(
-                    func.lower(HotelCheckinRecord.city) == city.lower()
-                )
+            query = self._apply_city_filter(query, city)
             if checkin_date:
                 query = query.filter(
                     HotelCheckinRecord.checkin_date == checkin_date
@@ -226,16 +291,15 @@ class DatabaseStorage(BaseStorage):
         """
         session = self.get_session()
         try:
-            query = session.query(func.count(HotelCheckinRecord.id))
+            query = self._quality_filter(
+                session.query(func.count(HotelCheckinRecord.id))
+            )
 
             if source:
                 query = query.filter(
                     HotelCheckinRecord.source == source.lower()
                 )
-            if city:
-                query = query.filter(
-                    func.lower(HotelCheckinRecord.city) == city.lower()
-                )
+            query = self._apply_city_filter(query, city)
 
             return query.scalar() or 0
 
@@ -259,11 +323,7 @@ class DatabaseStorage(BaseStorage):
                 func.avg(HotelCheckinRecord.nightly_rate).label("avg_rate"),
                 func.avg(HotelCheckinRecord.guest_score).label("avg_score"),
             )
-
-            if city:
-                query = query.filter(
-                    func.lower(HotelCheckinRecord.city) == city.lower()
-                )
+            query = self._apply_hotel_filters(query, city)
             if month:
                 query = query.filter(
                     func.extract("month", HotelCheckinRecord.checkin_date)
@@ -320,11 +380,7 @@ class DatabaseStorage(BaseStorage):
                     func.distinct(HotelCheckinRecord.hotel_name)
                 ).label("unique_hotels"),
             )
-
-            if city:
-                month_query = month_query.filter(
-                    func.lower(HotelCheckinRecord.city) == city.lower()
-                )
+            month_query = self._apply_hotel_filters(month_query, city)
             if year:
                 month_query = month_query.filter(
                     func.extract("year", HotelCheckinRecord.checkin_date)
@@ -381,6 +437,205 @@ class DatabaseStorage(BaseStorage):
                 "total_cities": total_result.cities if total_result else 0,
             }
 
+        finally:
+            session.close()
+
+    def get_overview(self, city: Optional[str] = None) -> Dict[str, Any]:
+        """Headline KPIs for the dashboard hero section.
+
+        Returns aggregate counts plus the single best hotel for each of the
+        three questions the dashboard answers: most check-ins, lowest price
+        (with a decent rating), and best rated overall.
+        """
+        session = self.get_session()
+        try:
+            def _scoped(query):
+                return self._apply_hotel_filters(query, city)
+
+            totals = _scoped(
+                session.query(
+                    func.count(HotelCheckinRecord.id).label("records"),
+                    func.count(
+                        func.distinct(HotelCheckinRecord.hotel_name)
+                    ).label("hotels"),
+                    func.count(
+                        func.distinct(HotelCheckinRecord.city)
+                    ).label("cities"),
+                    func.avg(HotelCheckinRecord.nightly_rate).label("avg_rate"),
+                    func.min(HotelCheckinRecord.nightly_rate).label("min_rate"),
+                    func.max(HotelCheckinRecord.nightly_rate).label("max_rate"),
+                    func.avg(HotelCheckinRecord.guest_score).label("avg_score"),
+                )
+            ).first()
+
+            # Per-source record counts
+            source_rows = _scoped(
+                session.query(
+                    HotelCheckinRecord.source,
+                    func.count(HotelCheckinRecord.id).label("count"),
+                )
+            ).group_by(HotelCheckinRecord.source).all()
+
+            most_checkins = self.get_top_hotels(city=city, limit=1)
+            cheapest = self.get_cheapest(city=city, min_score=8.0, limit=1)
+            best_rated = self.get_best_rated(city=city, min_reviews=50, limit=1)
+            best_value = self.get_best_value(city=city, limit=1)
+
+            return {
+                "total_records": totals.records if totals else 0,
+                "total_hotels": totals.hotels if totals else 0,
+                "total_cities": totals.cities if totals else 0,
+                "avg_nightly_rate": round(totals.avg_rate, 2)
+                if totals and totals.avg_rate
+                else 0,
+                "min_nightly_rate": round(totals.min_rate, 2)
+                if totals and totals.min_rate
+                else 0,
+                "max_nightly_rate": round(totals.max_rate, 2)
+                if totals and totals.max_rate
+                else 0,
+                "avg_guest_score": round(totals.avg_score, 2)
+                if totals and totals.avg_score
+                else 0,
+                "by_source": {r.source: r.count for r in source_rows},
+                "most_checkins": most_checkins[0] if most_checkins else None,
+                "cheapest": cheapest[0] if cheapest else None,
+                "best_rated": best_rated[0] if best_rated else None,
+                "best_value": best_value[0] if best_value else None,
+            }
+        finally:
+            session.close()
+
+    def get_cheapest(
+        self,
+        city: Optional[str] = None,
+        min_score: float = 0.0,
+        limit: int = 10,
+    ) -> List[Dict[str, Any]]:
+        """Cheapest individual offers, optionally filtered by a minimum score.
+
+        Useful for the "lowest price (good rating)" view: pass min_score to
+        avoid surfacing rock-bottom prices attached to poorly rated hotels.
+        """
+        session = self.get_session()
+        try:
+            query = self._apply_hotel_filters(
+                session.query(HotelCheckinRecord).filter(
+                    HotelCheckinRecord.nightly_rate > 0
+                ),
+                city,
+            )
+            if min_score:
+                query = query.filter(
+                    HotelCheckinRecord.guest_score >= min_score
+                )
+
+            records = (
+                query.order_by(HotelCheckinRecord.nightly_rate.asc())
+                .limit(limit)
+                .all()
+            )
+            return [r.to_dict() for r in records]
+        finally:
+            session.close()
+
+    def get_best_rated(
+        self,
+        city: Optional[str] = None,
+        min_reviews: int = 0,
+        limit: int = 10,
+    ) -> List[Dict[str, Any]]:
+        """Hotels ranked by average guest score (with a review-count floor)."""
+        session = self.get_session()
+        try:
+            query = session.query(
+                HotelCheckinRecord.hotel_name,
+                HotelCheckinRecord.city,
+                func.avg(HotelCheckinRecord.guest_score).label("avg_score"),
+                func.avg(HotelCheckinRecord.nightly_rate).label("avg_rate"),
+                func.max(HotelCheckinRecord.review_count).label("review_count"),
+                func.count(HotelCheckinRecord.id).label("checkin_count"),
+            )
+            query = self._apply_hotel_filters(query, city)
+
+            query = query.group_by(
+                HotelCheckinRecord.hotel_name, HotelCheckinRecord.city
+            )
+            if min_reviews:
+                query = query.having(
+                    func.max(HotelCheckinRecord.review_count) >= min_reviews
+                )
+
+            results = (
+                query.order_by(
+                    func.avg(HotelCheckinRecord.guest_score).desc()
+                )
+                .limit(limit)
+                .all()
+            )
+            return [
+                {
+                    "hotel_name": r.hotel_name,
+                    "city": r.city,
+                    "avg_guest_score": round(r.avg_score, 2) if r.avg_score else 0,
+                    "avg_nightly_rate": round(r.avg_rate, 2) if r.avg_rate else 0,
+                    "review_count": r.review_count or 0,
+                    "checkin_count": r.checkin_count,
+                }
+                for r in results
+            ]
+        finally:
+            session.close()
+
+    def get_best_value(
+        self,
+        city: Optional[str] = None,
+        limit: int = 10,
+    ) -> List[Dict[str, Any]]:
+        """Best value = high guest score per dollar of nightly rate.
+
+        Computes (avg_score / avg_rate) * 100 so a well-rated, affordable
+        hotel ranks above an expensive one with the same score.
+        """
+        session = self.get_session()
+        try:
+            query = self._apply_hotel_filters(
+                session.query(
+                    HotelCheckinRecord.hotel_name,
+                    HotelCheckinRecord.city,
+                    func.avg(HotelCheckinRecord.guest_score).label("avg_score"),
+                    func.avg(HotelCheckinRecord.nightly_rate).label("avg_rate"),
+                    func.count(HotelCheckinRecord.id).label("checkin_count"),
+                ).filter(HotelCheckinRecord.nightly_rate > 0),
+                city,
+            )
+
+            results = (
+                query.group_by(
+                    HotelCheckinRecord.hotel_name, HotelCheckinRecord.city
+                )
+                .having(func.avg(HotelCheckinRecord.guest_score) >= 7.0)
+                .all()
+            )
+
+            scored = []
+            for r in results:
+                if not r.avg_rate:
+                    continue
+                value_score = round((r.avg_score / r.avg_rate) * 100, 3)
+                scored.append(
+                    {
+                        "hotel_name": r.hotel_name,
+                        "city": r.city,
+                        "avg_guest_score": round(r.avg_score, 2),
+                        "avg_nightly_rate": round(r.avg_rate, 2),
+                        "checkin_count": r.checkin_count,
+                        "value_score": value_score,
+                    }
+                )
+
+            scored.sort(key=lambda x: x["value_score"], reverse=True)
+            return scored[:limit]
         finally:
             session.close()
 
@@ -515,19 +770,38 @@ class DatabaseStorage(BaseStorage):
         elif not scraped:
             scraped = datetime.utcnow()
 
+        # Some sources (SLTDA / data.gov.lk report rows) carry no stay dates.
+        # The check-in date column is NOT NULL, so fall back to the scrape
+        # date rather than failing the whole batch insert.
+        if checkin is None:
+            checkin = scraped.date()
+        if checkout is None:
+            checkout = checkin
+
         # Store extra fields as JSON
         known_fields = {
             "hotel_name", "source", "city", "country", "checkin_date",
             "checkout_date", "nightly_rate", "currency", "available_rooms",
             "occupancy_pct", "room_type", "guest_score", "review_count",
-            "scraped_at", "url",
+            "scraped_at", "url", "address", "search_city", "location_verified",
         }
         raw_data = {k: v for k, v in data.items() if k not in known_fields}
+        for extra_key in ("address", "search_city", "location_verified", "record_type"):
+            if extra_key in data and data[extra_key] not in (None, ""):
+                raw_data[extra_key] = data[extra_key]
+
+        city_value = data.get("city", "")
+        if city_value:
+            city_value = normalize_city(city_value)
+
+        hotel_name = (data.get("hotel_name") or "").strip()
+        if not hotel_name:
+            hotel_name = ""
 
         return HotelCheckinRecord(
-            hotel_name=data.get("hotel_name", "Unknown"),
-            source=data.get("source", "unknown"),
-            city=data.get("city", ""),
+            hotel_name=hotel_name,
+            source=(data.get("source") or "").lower(),
+            city=city_value,
             country=data.get("country", "Sri Lanka"),
             checkin_date=checkin,
             checkout_date=checkout,

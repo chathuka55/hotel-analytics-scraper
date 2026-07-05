@@ -43,6 +43,9 @@ class TestHotelParser:
         assert hotel["currency"] == "USD"
         assert hotel["guest_score"] == 8.7
         assert hotel["review_count"] == 1250
+        assert hotel["address"] == "77 Galle Road, Colombo"
+        assert hotel["city"] == "Colombo"
+        assert hotel["location_verified"] is True
 
     def test_agoda_parser(self, mock_agoda_html):
         """Test Agoda HTML parsing."""

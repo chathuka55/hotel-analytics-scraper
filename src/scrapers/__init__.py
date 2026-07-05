@@ -4,14 +4,16 @@ from .base import BaseScraper
 from .booking import BookingScraper
 from .agoda import AgodaScraper
 from .expedia import ExpediaScraper
+from .google import GoogleHotelsScraper
 from .sltda import SLTDAScraper
-from .datagovlk import DataGovLkScraper
+from .travel import TravelSiteScraper
 
 __all__ = [
     "BaseScraper",
+    "TravelSiteScraper",
     "BookingScraper",
     "AgodaScraper",
     "ExpediaScraper",
+    "GoogleHotelsScraper",
     "SLTDAScraper",
-    "DataGovLkScraper",
 ]

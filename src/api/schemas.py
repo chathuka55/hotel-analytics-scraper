@@ -26,6 +26,35 @@ class MonthlyStats(BaseModel):
     total_cities: int
 
 
+class RatedHotel(BaseModel):
+    """A hotel row ranked by rating or value."""
+
+    hotel_name: str
+    city: str
+    avg_guest_score: float
+    avg_nightly_rate: float
+    review_count: int = 0
+    checkin_count: int = 0
+    value_score: Optional[float] = None
+
+
+class Overview(BaseModel):
+    """Headline KPIs and the single best hotel per metric."""
+
+    total_records: int
+    total_hotels: int
+    total_cities: int
+    avg_nightly_rate: float
+    min_nightly_rate: float
+    max_nightly_rate: float
+    avg_guest_score: float
+    by_source: Dict[str, int]
+    most_checkins: Optional[TopHotel] = None
+    cheapest: Optional["HotelRecord"] = None
+    best_rated: Optional[RatedHotel] = None
+    best_value: Optional[RatedHotel] = None
+
+
 class HotelRecord(BaseModel):
     """A single raw scraped hotel record."""
 
@@ -45,6 +74,7 @@ class HotelRecord(BaseModel):
     review_count: int
     scraped_at: Optional[str] = None
     url: str
+    address: str = ""
     raw_data: Optional[Dict[str, Any]] = None
 
 
@@ -58,7 +88,7 @@ class HotelListResponse(BaseModel):
 class ScrapeRequest(BaseModel):
     """Request body to trigger a scrape job."""
 
-    source: str = Field(..., description="booking, agoda, expedia, sltda, datagovlk")
+    source: str = Field(..., description="Any registered source id (see /api/meta/sources)")
     city: str = "Colombo"
     checkin_date: Optional[date] = None
     checkout_date: Optional[date] = None
@@ -93,3 +123,7 @@ class SourceInfo(BaseModel):
     label: str
     requires_playwright: bool
     legal_note: str
+
+
+# Resolve the forward reference to HotelRecord used in Overview.cheapest.
+Overview.model_rebuild()

@@ -1,45 +1,90 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { api } from './api/client'
+import { OverviewView } from './components/OverviewView'
 import { TopHotelsView } from './components/TopHotelsView'
+import { PriceRatingsView } from './components/PriceRatingsView'
 import { MonthlyTrendsView } from './components/MonthlyTrendsView'
 import { HotelBrowserView } from './components/HotelBrowserView'
 import { ScrapeTriggerView } from './components/ScrapeTriggerView'
 
-const TABS = [
-  { id: 'top', label: 'Top Hotels', render: () => <TopHotelsView /> },
-  { id: 'monthly', label: 'Monthly Trends', render: () => <MonthlyTrendsView /> },
-  { id: 'browse', label: 'Browse Hotels', render: () => <HotelBrowserView /> },
-  { id: 'scrape', label: 'Run Scrape', render: () => <ScrapeTriggerView /> },
-] as const
+type TabId = 'overview' | 'top' | 'price' | 'monthly' | 'browse' | 'scrape'
+
+const TABS: { id: TabId; label: string; icon: string; sub: string }[] = [
+  { id: 'overview', label: 'Overview', icon: '◎', sub: 'Headline answers & KPIs' },
+  { id: 'top', label: 'Top Hotels', icon: '🔥', sub: 'Ranked by check-ins' },
+  { id: 'price', label: 'Price & Ratings', icon: '💸', sub: 'Lowest price · best rated · best value' },
+  { id: 'monthly', label: 'Monthly Trends', icon: '📈', sub: 'Check-in volume over time' },
+  { id: 'browse', label: 'Browse Records', icon: '🗂', sub: 'Raw scraped data' },
+  { id: 'scrape', label: 'Run Scrape', icon: '⚡', sub: 'Trigger a scrape job' },
+]
 
 function App() {
-  const [activeTab, setActiveTab] = useState<(typeof TABS)[number]['id']>('top')
+  const [tab, setTab] = useState<TabId>('overview')
+  const [cities, setCities] = useState<string[]>([])
+  const [city, setCity] = useState('')
+
+  useEffect(() => {
+    api.getCities().then(setCities).catch(() => {})
+  }, [])
+
+  const active = TABS.find((t) => t.id === tab)!
 
   return (
-    <div style={{ maxWidth: 1000, margin: '0 auto', padding: '24px 16px' }}>
-      <h1 style={{ fontSize: 28, marginBottom: 4 }}>Sri Lanka Hotel Analytics</h1>
-      <p style={{ color: 'var(--text-muted)', marginBottom: 24 }}>
-        Check-in data scraped from Booking.com, Agoda, Expedia, SLTDA &amp; data.gov.lk
-      </p>
+    <div className="app">
+      <aside className="sidebar">
+        <div className="brand">
+          <span className="brand-logo">⛱</span>
+          <span className="brand-text">
+            <b>HotelScope</b>
+            <span>Sri Lanka analytics</span>
+          </span>
+        </div>
 
-      <nav style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border)', marginBottom: 24 }}>
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            style={{
-              background: activeTab === tab.id ? 'var(--text-h)' : 'transparent',
-              color: activeTab === tab.id ? '#fff' : 'var(--text)',
-              border: 'none',
-              borderRadius: '6px 6px 0 0',
-              padding: '10px 16px',
-            }}
-          >
-            {tab.label}
+        {TABS.map((t) => (
+          <button key={t.id} className={`nav-item ${tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>
+            <span className="ico">{t.icon}</span>
+            {t.label}
           </button>
         ))}
-      </nav>
 
-      <main>{TABS.find((t) => t.id === activeTab)?.render()}</main>
+        <div className="sidebar-foot">
+          Data from Booking, Agoda, Expedia, Google Hotels &amp; SLTDA (Sri Lanka).
+          <br />
+          Educational project — respects robots.txt &amp; rate limits.
+        </div>
+      </aside>
+
+      <main className="content">
+        <div className="page-head">
+          <div>
+            <h1>{active.label}</h1>
+            <div className="sub">{active.sub}</div>
+          </div>
+          {tab !== 'scrape' && (
+            <label className="field" style={{ minWidth: 180 }}>
+              City filter
+              <select value={city} onChange={(e) => setCity(e.target.value)}>
+                <option value="">All cities</option>
+                {cities.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </label>
+          )}
+        </div>
+
+        <div className="banner">
+          Real Sri Lankan hotel data with verified cities. Live scraping uses Booking, Agoda, Expedia &amp; Google Hotels.
+          OTA sites may block bots — run <code>playwright install</code> for best results.
+        </div>
+
+        {tab === 'overview' && <OverviewView city={city} />}
+        {tab === 'top' && <TopHotelsView city={city} />}
+        {tab === 'price' && <PriceRatingsView city={city} />}
+        {tab === 'monthly' && <MonthlyTrendsView city={city} />}
+        {tab === 'browse' && <HotelBrowserView city={city} />}
+        {tab === 'scrape' && <ScrapeTriggerView city={city} />}
+      </main>
     </div>
   )
 }
