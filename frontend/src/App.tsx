@@ -6,6 +6,7 @@ import { PriceRatingsView } from './components/PriceRatingsView'
 import { MonthlyTrendsView } from './components/MonthlyTrendsView'
 import { HotelBrowserView } from './components/HotelBrowserView'
 import { ScrapeTriggerView } from './components/ScrapeTriggerView'
+import { LastScrapedPanel } from './components/LastScrapedPanel'
 
 type TabId = 'overview' | 'top' | 'price' | 'monthly' | 'browse' | 'scrape'
 
@@ -46,12 +47,6 @@ function App() {
             {t.label}
           </button>
         ))}
-
-        <div className="sidebar-foot">
-          Data from Booking, Agoda, Expedia, Google Hotels &amp; SLTDA (Sri Lanka).
-          <br />
-          Educational project — respects robots.txt &amp; rate limits.
-        </div>
       </aside>
 
       <main className="content">
@@ -71,12 +66,10 @@ function App() {
               </select>
             </label>
           )}
+          <LastScrapedPanel compact />
         </div>
 
-        <div className="banner">
-          Real Sri Lankan hotel data with verified cities. Live scraping uses Booking, Agoda, Expedia &amp; Google Hotels.
-          OTA sites may block bots — run <code>playwright install</code> for best results.
-        </div>
+        {tab === 'overview' && <LastScrapedPanel />}
 
         {tab === 'overview' && <OverviewView city={city} />}
         {tab === 'top' && <TopHotelsView city={city} />}
