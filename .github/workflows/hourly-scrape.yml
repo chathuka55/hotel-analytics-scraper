@@ -16,10 +16,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
           cache: pip
@@ -32,7 +34,7 @@ jobs:
           playwright install chromium
 
       - name: Restore scrape database cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             data/hotel_scraper.db
@@ -45,6 +47,7 @@ jobs:
         run: make db-init
 
       - name: Run automated scrape (all sources)
+        id: automation
         run: make scrape-automation
         env:
           DATABASE_URL: sqlite:///data/hotel_scraper.db
@@ -54,13 +57,22 @@ jobs:
 
       - name: Upload scrape artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: scrape-data
           path: |
             data/hotel_scraper.db
             data/cache/scrape_status.json
           if-no-files-found: warn
+
+      - name: Verify automation completed
+        if: always()
+        run: |
+          if [ ! -f data/cache/scrape_status.json ]; then
+            echo "Automation cache missing — scrape runner may not have finished."
+            exit 1
+          fi
+          echo "Automation cache present. Scrape step exit: ${{ steps.automation.outcome }}"
 
       - name: Run tests
         run: pytest tests/ -q --ignore=tests/test_live_scrapers.py
