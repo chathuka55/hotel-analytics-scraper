@@ -48,6 +48,24 @@ export interface SourceInfo {
   legal_note: string
 }
 
+export interface SourceScrapeStatus {
+  source: string
+  label: string
+  last_scraped_at: string | null
+  last_attempt_at: string | null
+  last_status: string
+  last_error: string
+  records_in_db: number
+  using_cached_data: boolean
+}
+
+export interface LastScrapedSummary {
+  overall_last_scraped_at: string | null
+  last_automation_run_at: string | null
+  data_from_cache: boolean
+  sources: SourceScrapeStatus[]
+}
+
 export interface ScrapeRequest {
   source: string
   city: string
@@ -141,6 +159,8 @@ export const api = {
   getSources: () => request<SourceInfo[]>('/api/meta/sources'),
 
   getCities: () => request<string[]>('/api/meta/cities'),
+
+  getLastScraped: () => request<LastScrapedSummary>('/api/meta/last-scraped'),
 
   triggerScrape: (body: ScrapeRequest) =>
     request<ScrapeJobAccepted>('/api/scrape', {

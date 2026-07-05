@@ -45,9 +45,9 @@ services:
       redis:
         condition: service_started
     command: >
-      python -m src.main schedule
-      --interval 24
-      --sources booking,agoda,sltda,datagovlk
+      python -m src.main --storage database schedule
+      --interval 1
+      --sources all
       --cities Colombo,Kandy,Galle
 
   # --- API Server ---

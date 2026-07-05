@@ -54,6 +54,10 @@ data/processed/*.parquet
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 
+# --- Automation cache (runtime scrape status) ---
+data/cache/*.json
+!data/cache/.gitkeep
+
 # --- Logs ---
 logs/
 *.log
