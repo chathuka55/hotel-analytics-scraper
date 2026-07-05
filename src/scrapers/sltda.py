@@ -248,11 +248,11 @@ class SLTDAScraper(BaseScraper):
             if any(k in header_lower for k in ["country", "nationality", "market"]):
                 record["origin_country"] = value
             elif any(k in header_lower for k in ["year", "period"]):
-                year_match = re.search(r"\\d{4}", value)
+                year_match = re.search(r"\d{4}", value)
                 if year_match:
                     record["year"] = int(year_match.group())
             elif any(k in header_lower for k in ["month"]):
-                month_match = re.search(r"\\d{1,2}", value)
+                month_match = re.search(r"\d{1,2}", value)
                 if month_match:
                     record["month"] = int(month_match.group())
             elif any(k in header_lower for k in ["arrival", "visitor", "tourist", "count", "number"]):
@@ -289,15 +289,15 @@ class SLTDAScraper(BaseScraper):
             elif any(k in header_lower for k in ["region", "area", "district", "city"]):
                 record["city"] = value
             elif any(k in header_lower for k in ["year"]):
-                year_match = re.search(r"\\d{4}", value)
+                year_match = re.search(r"\d{4}", value)
                 if year_match:
                     record["year"] = int(year_match.group())
             elif any(k in header_lower for k in ["month"]):
-                month_match = re.search(r"\\d{1,2}", value)
+                month_match = re.search(r"\d{1,2}", value)
                 if month_match:
                     record["month"] = int(month_match.group())
             elif any(k in header_lower for k in ["occupancy", "rate", "%"]):
-                pct_match = re.search(r"\\d+[.,]?\\d*", value)
+                pct_match = re.search(r"\d+[.,]?\d*", value)
                 if pct_match:
                     record["occupancy_pct"] = float(pct_match.group().replace(",", "."))
             elif any(k in header_lower for k in ["room", "night"]):
@@ -330,15 +330,15 @@ class SLTDAScraper(BaseScraper):
             header_lower = header.lower()
 
             if any(k in header_lower for k in ["year"]):
-                year_match = re.search(r"\\d{4}", value)
+                year_match = re.search(r"\d{4}", value)
                 if year_match:
                     record["year"] = int(year_match.group())
             elif any(k in header_lower for k in ["month"]):
-                month_match = re.search(r"\\d{1,2}", value)
+                month_match = re.search(r"\d{1,2}", value)
                 if month_match:
                     record["month"] = int(month_match.group())
             elif any(k in header_lower for k in ["revenue", "income", "earning"]):
-                num = re.sub(r"[^\\d.]", "", value)
+                num = re.sub(r"[^\d.]", "", value)
                 if num:
                     record["revenue_usd"] = float(num)
 
@@ -395,7 +395,7 @@ class SLTDAScraper(BaseScraper):
                 text = link.get_text(strip=True)
 
                 # Extract year and month from link text
-                year_match = re.search(r"\\d{4}", text)
+                year_match = re.search(r"\d{4}", text)
                 month_match = re.search(
                     r"(January|February|March|April|May|June|July|August|"
                     r"September|October|November|December)",

@@ -1,18 +1,13 @@
 import { useEffect, useState } from 'react'
 import { api, type TopHotel } from '../api/client'
+import { Card, Empty, ErrorBox, Loading, Rank, ScoreBadge, money } from './ui'
 
-export function TopHotelsView() {
-  const [cities, setCities] = useState<string[]>([])
-  const [city, setCity] = useState('')
+export function TopHotelsView({ city }: { city: string }) {
   const [month, setMonth] = useState('')
   const [year, setYear] = useState('')
   const [hotels, setHotels] = useState<TopHotel[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    api.getCities().then(setCities).catch(() => {})
-  }, [])
 
   useEffect(() => {
     setLoading(true)
@@ -29,76 +24,67 @@ export function TopHotelsView() {
       .finally(() => setLoading(false))
   }, [city, month, year])
 
+  const maxCount = hotels.reduce((m, h) => Math.max(m, h.checkin_count), 0) || 1
+
   return (
-    <div>
-      <h2>Top Hotels by Check-ins</h2>
-      <div style={{ display: 'flex', gap: 12, margin: '16px 0' }}>
-        <label>
-          City
-          <select value={city} onChange={(e) => setCity(e.target.value)}>
-            <option value="">All cities</option>
-            {cities.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
+    <Card title="Hotels ranked by check-in count">
+      <div className="filters">
+        <label className="field">
           Month
           <select value={month} onChange={(e) => setMonth(e.target.value)}>
             <option value="">All months</option>
             {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
+              <option key={m} value={m}>{m}</option>
             ))}
           </select>
         </label>
-        <label>
+        <label className="field">
           Year
-          <input
-            type="number"
-            placeholder="e.g. 2026"
-            value={year}
-            onChange={(e) => setYear(e.target.value)}
-            style={{ width: 90 }}
-          />
+          <input type="number" placeholder="e.g. 2026" value={year} onChange={(e) => setYear(e.target.value)} style={{ width: 110 }} />
         </label>
       </div>
 
-      {loading && <p>Loading...</p>}
-      {error && <p style={{ color: 'var(--danger)' }}>{error}</p>}
-      {!loading && !error && hotels.length === 0 && (
-        <p>No data found. Run a scrape first, or seed sample data.</p>
-      )}
-
-      {hotels.length > 0 && (
-        <table>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Hotel</th>
-              <th>City</th>
-              <th>Check-ins</th>
-              <th>Avg rate</th>
-              <th>Avg score</th>
-            </tr>
-          </thead>
-          <tbody>
-            {hotels.map((h, i) => (
-              <tr key={`${h.hotel_name}-${h.city}`}>
-                <td>{i + 1}</td>
-                <td>{h.hotel_name}</td>
-                <td>{h.city}</td>
-                <td>{h.checkin_count}</td>
-                <td>${h.avg_nightly_rate.toFixed(2)}</td>
-                <td>{h.avg_guest_score.toFixed(1)}</td>
+      {loading ? (
+        <Loading />
+      ) : error ? (
+        <ErrorBox message={error} />
+      ) : hotels.length === 0 ? (
+        <Empty />
+      ) : (
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Hotel</th>
+                <th>City</th>
+                <th style={{ width: 220 }}>Check-ins</th>
+                <th className="num">Avg rate</th>
+                <th className="num">Avg score</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {hotels.map((h, i) => (
+                <tr key={`${h.hotel_name}-${h.city}`}>
+                  <td><Rank n={i + 1} /></td>
+                  <td className="hotel-cell">{h.hotel_name}</td>
+                  <td className="muted">{h.city}</td>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ flex: 1, height: 8, background: 'var(--surface-3)', borderRadius: 999, overflow: 'hidden' }}>
+                        <div style={{ width: `${(h.checkin_count / maxCount) * 100}%`, height: '100%', background: 'linear-gradient(90deg, #2dd4a7, #38bdf8)', borderRadius: 999 }} />
+                      </div>
+                      <b style={{ minWidth: 22, textAlign: 'right' }}>{h.checkin_count}</b>
+                    </div>
+                  </td>
+                  <td className="num">{money(h.avg_nightly_rate)}</td>
+                  <td className="num"><ScoreBadge score={h.avg_guest_score} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
-    </div>
+    </Card>
   )
 }

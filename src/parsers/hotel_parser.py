@@ -7,7 +7,8 @@ from typing import Any, Dict, List, Optional
 from src.config.settings import Selectors, get_selectors
 from src.monitoring.logger import get_logger
 from src.parsers.base import BaseParser
-from src.utils.validators import parse_price, sanitize_text
+from src.utils.location import resolve_record_city
+from src.utils.validators import is_junk_record, parse_price, sanitize_text
 
 logger = get_logger(__name__)
 
@@ -54,7 +55,11 @@ class HotelParser(BaseParser):
                 hotel_data = self._parse_hotel_item(
                     item, city, checkin_date, checkout_date
                 )
-                if hotel_data and hotel_data.get("hotel_name"):
+                if (
+                    hotel_data
+                    and hotel_data.get("hotel_name")
+                    and not is_junk_record(hotel_data)
+                ):
                     results.append(hotel_data)
             except Exception as e:
                 logger.warning(f"Failed to parse hotel item: {e}")
@@ -103,6 +108,7 @@ class HotelParser(BaseParser):
             "country": "Sri Lanka",
             "checkin_date": checkin_date,
             "checkout_date": checkout_date,
+            "search_city": city,
         }
 
         # Hotel name
@@ -146,14 +152,133 @@ class HotelParser(BaseParser):
             if review_text:
                 data["review_count"] = self._extract_number(review_text)
 
-        # Location
+        # Location / address (stored separately from room type)
         location_selector = self.selectors.get(self.source, "hotel_location")
+        scraped_location = ""
         if location_selector:
-            data["room_type"] = sanitize_text(
+            scraped_location = sanitize_text(
                 self.extract_text(item, location_selector)
             )
+            if scraped_location:
+                data["address"] = scraped_location
+
+        # Optional explicit city from listing (some sites show city separately)
+        city_selector = self.selectors.get(self.source, "hotel_city")
+        explicit_city = ""
+        if city_selector:
+            explicit_city = sanitize_text(
+                self.extract_text(item, city_selector)
+            )
+
+        resolved_city, location_verified = resolve_record_city(
+            scraped_location,
+            city,
+            explicit_city,
+            hotel_name=data.get("hotel_name", ""),
+            url=data.get("url", ""),
+        )
+        if location_verified and resolved_city:
+            data["city"] = resolved_city
+            data["location_verified"] = True
+        else:
+            # Do not inherit search city — prevents Galle-search/Kandy-hotel mislabels
+            data["city"] = ""
+            data["location_verified"] = False
+
+        # Defaults for validation
+        data.setdefault("nightly_rate", 0.0)
+        data.setdefault("currency", "USD")
+        data.setdefault("scraped_at", datetime.utcnow())
+
+        # Room type (only when a dedicated selector exists)
+        room_selector = self.selectors.get(self.source, "hotel_room_type")
+        if room_selector:
+            room_type = sanitize_text(self.extract_text(item, room_selector))
+            if room_type:
+                data["room_type"] = room_type
+
+        # Try JSON-LD structured data for address/coordinates when CSS misses
+        if not scraped_location:
+            ld_data = self._extract_json_ld_location(item)
+            if ld_data.get("address"):
+                data["address"] = ld_data["address"]
+                resolved_city, location_verified = resolve_record_city(
+                    ld_data["address"],
+                    city,
+                    ld_data.get("city", ""),
+                    hotel_name=data.get("hotel_name", ""),
+                    url=data.get("url", ""),
+                )
+                if location_verified and resolved_city:
+                    data["city"] = resolved_city
+                    data["location_verified"] = True
+            if ld_data.get("latitude") and ld_data.get("longitude"):
+                data["latitude"] = ld_data["latitude"]
+                data["longitude"] = ld_data["longitude"]
+
+        # Last resort: scan card text for a city mention
+        if not data.get("location_verified"):
+            card_text = sanitize_text(item.get_text(" ", strip=True)[:800])
+            resolved_city, location_verified = resolve_record_city(
+                card_text, city, "", data.get("hotel_name", ""), data.get("url", "")
+            )
+            if location_verified and resolved_city:
+                data["city"] = resolved_city
+                data["location_verified"] = True
+                if not data.get("address"):
+                    data["address"] = card_text[:200]
 
         return data
+
+    def _extract_json_ld_location(self, item) -> Dict[str, Any]:
+        """Extract location from embedded JSON-LD in a listing element."""
+        result: Dict[str, Any] = {}
+        if item is None:
+            return result
+
+        scripts = item.select('script[type="application/ld+json"]')
+        for script in scripts:
+            try:
+                import json
+
+                payload = json.loads(script.string or "")
+                items = payload if isinstance(payload, list) else [payload]
+                for entry in items:
+                    if not isinstance(entry, dict):
+                        continue
+                    if entry.get("@type") not in (
+                        "Hotel",
+                        "LodgingBusiness",
+                        "Place",
+                        None,
+                    ):
+                        continue
+                    addr = entry.get("address", {})
+                    if isinstance(addr, dict):
+                        parts = [
+                            addr.get("streetAddress", ""),
+                            addr.get("addressLocality", ""),
+                            addr.get("addressRegion", ""),
+                        ]
+                        address = ", ".join(p for p in parts if p)
+                        if address:
+                            result["address"] = sanitize_text(address)
+                        if addr.get("addressLocality"):
+                            result["city"] = sanitize_text(
+                                addr["addressLocality"]
+                            )
+                    elif isinstance(addr, str) and addr:
+                        result["address"] = sanitize_text(addr)
+                    geo = entry.get("geo", {})
+                    if isinstance(geo, dict):
+                        if geo.get("latitude"):
+                            result["latitude"] = float(geo["latitude"])
+                        if geo.get("longitude"):
+                            result["longitude"] = float(geo["longitude"])
+            except (json.JSONDecodeError, ValueError, TypeError):
+                continue
+
+        return result
 
     def _parse_detail_by_source(self, soup) -> Dict[str, Any]:
         """Parse hotel detail page based on source-specific selectors.

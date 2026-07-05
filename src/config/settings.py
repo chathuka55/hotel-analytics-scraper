@@ -74,6 +74,15 @@ class SourceSettings(BaseSettings):
     booking_base_url: str = "https://www.booking.com"
     agoda_base_url: str = "https://www.agoda.com"
     expedia_base_url: str = "https://www.expedia.com"
+    skyscanner_base_url: str = "https://www.skyscanner.net"
+    rehlat_base_url: str = "https://www.rehlat.co"
+    traveloka_base_url: str = "https://www.traveloka.com"
+    tripadvisor_base_url: str = "https://www.tripadvisor.com"
+    tripcom_base_url: str = "https://www.trip.com"
+    goseek_base_url: str = "https://www.goseek.com"
+    etrip_base_url: str = "https://search.etrip.net"
+    hotelscom_base_url: str = "https://www.hotels.com"
+    google_base_url: str = "https://www.google.com"
     sltda_base_url: str = "https://www.sltda.gov.lk"
     datagovlk_base_url: str = "https://www.data.gov.lk"
 
@@ -142,6 +151,15 @@ class Settings(BaseSettings):
             "booking": self.sources.booking_base_url,
             "agoda": self.sources.agoda_base_url,
             "expedia": self.sources.expedia_base_url,
+            "skyscanner": self.sources.skyscanner_base_url,
+            "rehlat": self.sources.rehlat_base_url,
+            "traveloka": self.sources.traveloka_base_url,
+            "tripadvisor": self.sources.tripadvisor_base_url,
+            "tripcom": self.sources.tripcom_base_url,
+            "goseek": self.sources.goseek_base_url,
+            "etrip": self.sources.etrip_base_url,
+            "hotelscom": self.sources.hotelscom_base_url,
+            "google": self.sources.google_base_url,
             "sltda": self.sources.sltda_base_url,
             "datagovlk": self.sources.datagovlk_base_url,
         }

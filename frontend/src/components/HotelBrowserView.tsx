@@ -1,23 +1,25 @@
 import { useEffect, useState } from 'react'
 import { api, type HotelRecord, type SourceInfo } from '../api/client'
+import { Card, Empty, ErrorBox, Loading, ScoreBadge, SourceBadge, money } from './ui'
 
 const PAGE_SIZE = 20
 
-export function HotelBrowserView() {
+export function HotelBrowserView({ city }: { city: string }) {
   const [sources, setSources] = useState<SourceInfo[]>([])
-  const [cities, setCities] = useState<string[]>([])
   const [source, setSource] = useState('')
-  const [city, setCity] = useState('')
   const [page, setPage] = useState(0)
   const [items, setItems] = useState<HotelRecord[]>([])
   const [total, setTotal] = useState(0)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     api.getSources().then(setSources).catch(() => {})
-    api.getCities().then(setCities).catch(() => {})
   }, [])
+
+  useEffect(() => {
+    setPage(0)
+  }, [city, source])
 
   useEffect(() => {
     setLoading(true)
@@ -40,97 +42,73 @@ export function HotelBrowserView() {
   const maxPage = Math.max(0, Math.ceil(total / PAGE_SIZE) - 1)
 
   return (
-    <div>
-      <h2>Browse Scraped Records</h2>
-      <div style={{ display: 'flex', gap: 12, margin: '16px 0' }}>
-        <label>
+    <Card title={`Raw scraped records${total ? ` · ${total.toLocaleString()}` : ''}`}>
+      <div className="filters">
+        <label className="field">
           Source
-          <select
-            value={source}
-            onChange={(e) => {
-              setSource(e.target.value)
-              setPage(0)
-            }}
-          >
+          <select value={source} onChange={(e) => setSource(e.target.value)}>
             <option value="">All sources</option>
             {sources.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          City
-          <select
-            value={city}
-            onChange={(e) => {
-              setCity(e.target.value)
-              setPage(0)
-            }}
-          >
-            <option value="">All cities</option>
-            {cities.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
+              <option key={s.id} value={s.id}>{s.label}</option>
             ))}
           </select>
         </label>
       </div>
 
-      {loading && <p>Loading...</p>}
-      {error && <p style={{ color: 'var(--danger)' }}>{error}</p>}
-      {!loading && !error && items.length === 0 && (
-        <p>No data found. Run a scrape first, or seed sample data.</p>
-      )}
-
-      {items.length > 0 && (
+      {loading ? (
+        <Loading />
+      ) : error ? (
+        <ErrorBox message={error} />
+      ) : items.length === 0 ? (
+        <Empty />
+      ) : (
         <>
-          <table>
-            <thead>
-              <tr>
-                <th>Hotel</th>
-                <th>Source</th>
-                <th>City</th>
-                <th>Check-in</th>
-                <th>Check-out</th>
-                <th>Rate</th>
-                <th>Occupancy</th>
-                <th>Score</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((r) => (
-                <tr key={r.id}>
-                  <td>{r.hotel_name}</td>
-                  <td>{r.source}</td>
-                  <td>{r.city}</td>
-                  <td>{r.checkin_date}</td>
-                  <td>{r.checkout_date}</td>
-                  <td>
-                    {r.currency} {r.nightly_rate.toFixed(2)}
-                  </td>
-                  <td>{r.occupancy_pct.toFixed(1)}%</td>
-                  <td>{r.guest_score.toFixed(1)}</td>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Hotel</th>
+                  <th>Source</th>
+                  <th>City</th>
+                  <th>Check-in</th>
+                  <th>Location</th>
+                  <th>Room</th>
+                  <th className="num">Rate</th>
+                  <th className="num">Occupancy</th>
+                  <th className="num">Score</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {items.map((r) => (
+                  <tr key={r.id}>
+                    <td className="hotel-cell">{r.hotel_name}</td>
+                    <td><SourceBadge source={r.source} /></td>
+                    <td className="muted">{r.city}</td>
+                    <td className="muted">{r.checkin_date}</td>
+                    <td className="muted">{r.address || '—'}</td>
+                    <td className="muted">{r.room_type || '—'}</td>
+                    <td className="num">{money(r.nightly_rate, r.currency)}</td>
+                    <td className="num">{r.occupancy_pct.toFixed(0)}%</td>
+                    <td className="num"><ScoreBadge score={r.guest_score} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12 }}>
-            <button disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
-              Prev
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 16 }}>
+            <button className="ghost" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
+              ← Prev
             </button>
-            <span>
-              Page {page + 1} of {maxPage + 1} ({total} records)
+            <span className="muted" style={{ fontSize: 13 }}>
+              Page {page + 1} of {maxPage + 1}
             </span>
-            <button disabled={page >= maxPage} onClick={() => setPage((p) => p + 1)}>
-              Next
+            <button className="ghost" disabled={page >= maxPage} onClick={() => setPage((p) => p + 1)}>
+              Next →
             </button>
           </div>
         </>
       )}
-    </div>
+    </Card>
   )
 }
