@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type ScrapeJobStatus, type SourceInfo } from '../api/client'
 import { Card, ErrorBox, SourceBadge } from './ui'
-
-const SAFE_SOURCES = new Set(['sltda', 'datagovlk'])
+import { LastScrapedPanel } from './LastScrapedPanel'
 
 function defaultDate(daysFromNow: number): string {
   const d = new Date()
@@ -45,9 +44,6 @@ export function ScrapeTriggerView({ city: globalCity }: { city: string }) {
     if (globalCity) setCity(globalCity)
   }, [globalCity])
 
-  const selectedSource = sources.find((s) => s.id === source)
-  const isSafe = SAFE_SOURCES.has(source)
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
@@ -85,7 +81,9 @@ export function ScrapeTriggerView({ city: globalCity }: { city: string }) {
   }
 
   return (
-    <div className="grid grid-2" style={{ alignItems: 'start' }}>
+    <div>
+      <LastScrapedPanel />
+      <div className="grid grid-2 section" style={{ alignItems: 'start' }}>
       <Card title="Trigger a scrape job">
         <form onSubmit={handleSubmit} className="filters" style={{ marginBottom: 0 }}>
           <label className="field">
@@ -116,13 +114,6 @@ export function ScrapeTriggerView({ city: globalCity }: { city: string }) {
             {submitting || status?.status === 'started' ? 'Running…' : 'Run scrape'}
           </button>
         </form>
-
-        {!isSafe && selectedSource && (
-          <div className="banner" style={{ marginTop: 16, marginBottom: 0 }}>
-            ⚠ {selectedSource.label} is a commercial site with anti-bot protection — live requests
-            often return no data. SLTDA / data.gov.lk are the reliable, legal sources for demos.
-          </div>
-        )}
 
         {error && <div style={{ marginTop: 14 }}><ErrorBox message={error} /></div>}
 
@@ -155,6 +146,7 @@ export function ScrapeTriggerView({ city: globalCity }: { city: string }) {
           </div>
         )}
       </Card>
+      </div>
     </div>
   )
 }

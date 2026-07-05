@@ -47,9 +47,6 @@ export function Empty({ label = 'No data yet' }: { label?: string }) {
     <div className="state">
       <div className="big">∅</div>
       <div>{label}</div>
-      <div className="dim" style={{ fontSize: 13 }}>
-        Run a scrape or seed sample data to populate the dashboard.
-      </div>
     </div>
   )
 }

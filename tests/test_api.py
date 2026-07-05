@@ -74,6 +74,21 @@ def test_meta_sources_and_cities(client):
     assert "Colombo" in cities
 
 
+def test_last_scraped_endpoint(client, test_db_url, sample_hotel_records):
+    storage = DatabaseStorage(test_db_url)
+    storage.save(sample_hotel_records)
+    storage.log_scrape_start("booking", "Colombo")
+    storage.close()
+
+    resp = client.get("/api/meta/last-scraped")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "sources" in data
+    assert len(data["sources"]) >= 5
+    booking = next(row for row in data["sources"] if row["source"] == "booking")
+    assert booking["records_in_db"] >= 1
+
+
 def test_trigger_and_poll_scrape(client, monkeypatch):
     monkeypatch.setattr(
         "src.api.routers.scrape.run_source_scrape",

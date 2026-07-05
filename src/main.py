@@ -276,67 +276,115 @@ def monthly(ctx, city, year, output_format):
 @click.option(
     "--interval",
     type=int,
-    default=24,
-    help="Run interval in hours",
+    default=1,
+    help="Run interval in hours (default: every hour)",
 )
 @click.option(
     "--sources",
-    default="booking,agoda,sltda",
-    help="Comma-separated list of sources",
+    default="all",
+    help="Comma-separated sources or 'all'",
 )
 @click.option(
     "--cities",
     default="Colombo,Kandy,Galle",
     help="Comma-separated list of cities",
 )
+@click.option("--max-pages", default=2, help="Max pages per travel source")
 @click.pass_context
 def schedule(ctx, interval, sources, cities):
-    """Run scraper on a schedule (daemon mode)."""
+    """Run automated scraper on a schedule (daemon mode)."""
     from apscheduler.schedulers.blocking import BlockingScheduler
     from apscheduler.triggers.interval import IntervalTrigger
 
-    configure_logging()
-    logger.info("Starting scheduler")
+    from src.automation.runner import run_automated_scrape
 
-    scheduler = BlockingScheduler()
-    source_list = [s.strip() for s in sources.split(",")]
-    city_list = [c.strip() for c in cities.split(",")]
+    configure_logging()
+    logger.info("Starting hourly automation scheduler")
+
+    if sources.strip().lower() == "all":
+        source_list = list(ALL_SOURCES)
+    else:
+        source_list = [s.strip() for s in sources.split(",") if s.strip()]
+
+    city_list = [c.strip() for c in cities.split(",") if c.strip()]
+    storage = get_storage(ctx)
 
     def scheduled_job():
-        """Job to run on schedule."""
-        logger.info("Running scheduled scrape")
-        for source in source_list:
-            for city in city_list:
-                try:
-                    ctx.invoke(
-                        scrape,
-                        source=source,
-                        city=city,
-                        max_pages=2,
-                    )
-                except Exception as e:
-                    logger.error(f"Scheduled scrape failed: {e}")
+        logger.info("Running scheduled automation scrape")
+        try:
+            summary = run_automated_scrape(
+                storage=storage if ctx.obj.get("storage_type") in ("database", "db") else None,
+                cities=city_list,
+                sources=source_list,
+                max_pages=max_pages,
+                own_storage=ctx.obj.get("storage_type") not in ("database", "db"),
+            )
+            logger.info(
+                "Scheduled scrape finished | records=%s jobs=%s",
+                summary.get("records_scraped"),
+                summary.get("jobs_run"),
+            )
+        except Exception as e:
+            logger.error(f"Scheduled automation scrape failed: {e}")
 
-    # Add job
+    scheduler = BlockingScheduler()
     scheduler.add_job(
         scheduled_job,
         trigger=IntervalTrigger(hours=interval),
-        id="scraper_job",
-        name="Hotel Scraper",
+        id="automation_scrape_job",
+        name="Hotel Automation Scrape",
         replace_existing=True,
     )
 
-    # Run immediately first
     scheduled_job()
 
-    logger.info(f"Scheduler running every {interval} hours")
-    click.echo(f"Scheduler running. Press Ctrl+C to stop.")
+    logger.info(f"Scheduler running every {interval} hour(s)")
+    click.echo(f"Automation scheduler running every {interval} hour(s). Press Ctrl+C to stop.")
 
     try:
         scheduler.start()
     except KeyboardInterrupt:
         logger.info("Scheduler stopped")
         scheduler.shutdown()
+
+
+@cli.command("automate")
+@click.option(
+    "--sources",
+    default="all",
+    help="Comma-separated sources or 'all'",
+)
+@click.option(
+    "--cities",
+    default="Colombo,Kandy,Galle",
+    help="Comma-separated list of cities",
+)
+@click.option("--max-pages", default=2, help="Max pages per travel source")
+@click.pass_context
+def automate(ctx, sources, cities, max_pages):
+    """Run one full automation pass (all sources, logging + cache)."""
+    from src.automation.runner import run_automated_scrape
+
+    if sources.strip().lower() == "all":
+        source_list = list(ALL_SOURCES)
+    else:
+        source_list = [s.strip() for s in sources.split(",") if s.strip()]
+
+    city_list = [c.strip() for c in cities.split(",") if c.strip()]
+    storage = get_storage(ctx)
+
+    summary = run_automated_scrape(
+        storage=storage if ctx.obj.get("storage_type") in ("database", "db") else None,
+        cities=city_list,
+        sources=source_list,
+        max_pages=max_pages,
+        own_storage=ctx.obj.get("storage_type") not in ("database", "db"),
+    )
+
+    click.echo(
+        f"Automation complete: {summary['records_scraped']} records "
+        f"from {summary['jobs_run']} jobs"
+    )
 
 
 # --- Utility Commands ---

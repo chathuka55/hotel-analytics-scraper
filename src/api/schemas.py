@@ -125,5 +125,27 @@ class SourceInfo(BaseModel):
     legal_note: str
 
 
+class SourceScrapeStatus(BaseModel):
+    """Last scrape timing and fallback state for one source."""
+
+    source: str
+    label: str
+    last_scraped_at: Optional[str] = None
+    last_attempt_at: Optional[str] = None
+    last_status: str = "never"
+    last_error: str = ""
+    records_in_db: int = 0
+    using_cached_data: bool = False
+
+
+class LastScrapedSummary(BaseModel):
+    """Aggregate scrape freshness shown in the dashboard."""
+
+    overall_last_scraped_at: Optional[str] = None
+    last_automation_run_at: Optional[str] = None
+    data_from_cache: bool = False
+    sources: List[SourceScrapeStatus]
+
+
 # Resolve the forward reference to HotelRecord used in Overview.cheapest.
 Overview.model_rebuild()
