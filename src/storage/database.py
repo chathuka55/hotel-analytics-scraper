@@ -639,6 +639,118 @@ class DatabaseStorage(BaseStorage):
         finally:
             session.close()
 
+    def get_source_latest_scraped_at(self, source: str) -> Optional[str]:
+        """Latest scraped_at timestamp for a source's hotel records."""
+        session = self.get_session()
+        try:
+            latest = (
+                session.query(func.max(HotelCheckinRecord.scraped_at))
+                .filter(HotelCheckinRecord.source == source.lower())
+                .scalar()
+            )
+            return latest.isoformat() if latest else None
+        finally:
+            session.close()
+
+    def get_source_record_count(self, source: str) -> int:
+        """Count quality-filtered records for a source."""
+        session = self.get_session()
+        try:
+            query = session.query(HotelCheckinRecord).filter(
+                HotelCheckinRecord.source == source.lower()
+            )
+            query = self._apply_hotel_filters(query)
+            return query.count()
+        finally:
+            session.close()
+
+    def get_last_scraped_summary(self) -> Dict[str, Any]:
+        """Per-source scrape status for the UI and automation cache."""
+        from src.config.sources_registry import ALL_SOURCES, SOURCE_LABELS
+        from src.storage.scrape_cache import load_cache
+
+        cache = load_cache()
+        cache_sources = cache.get("sources", {})
+        session = self.get_session()
+        sources_summary: List[Dict[str, Any]] = []
+
+        try:
+            for source_id in ALL_SOURCES:
+                latest_log = (
+                    session.query(ScrapeLog)
+                    .filter(ScrapeLog.source == source_id)
+                    .order_by(ScrapeLog.started_at.desc())
+                    .first()
+                )
+                latest_success_log = (
+                    session.query(ScrapeLog)
+                    .filter(
+                        ScrapeLog.source == source_id,
+                        ScrapeLog.status == "success",
+                    )
+                    .order_by(ScrapeLog.completed_at.desc())
+                    .first()
+                )
+                data_at = (
+                    session.query(func.max(HotelCheckinRecord.scraped_at))
+                    .filter(HotelCheckinRecord.source == source_id)
+                    .scalar()
+                )
+                count_query = session.query(HotelCheckinRecord).filter(
+                    HotelCheckinRecord.source == source_id
+                )
+                records_in_db = self._apply_hotel_filters(count_query).count()
+                cached = cache_sources.get(source_id, {})
+
+                last_attempt_at = None
+                last_status = cached.get("last_status", "never")
+                last_error = cached.get("last_error", "")
+                if latest_log:
+                    last_attempt_at = latest_log.started_at
+                    last_status = latest_log.status
+                    last_error = latest_log.error_message or ""
+
+                log_success_dt = (
+                    latest_success_log.completed_at if latest_success_log else None
+                )
+                candidates = [d for d in (data_at, log_success_dt) if d]
+                last_scraped_at = max(candidates) if candidates else None
+
+                using_cached_data = bool(
+                    records_in_db > 0
+                    and last_status == "failed"
+                    and data_at is not None
+                )
+
+                sources_summary.append(
+                    {
+                        "source": source_id,
+                        "label": SOURCE_LABELS.get(source_id, source_id.title()),
+                        "last_scraped_at": last_scraped_at.isoformat() if last_scraped_at else None,
+                        "last_attempt_at": last_attempt_at.isoformat() if last_attempt_at else cached.get("last_attempt_at"),
+                        "last_status": last_status if latest_log else cached.get("last_status", "never"),
+                        "last_error": last_error or cached.get("last_error", ""),
+                        "records_in_db": records_in_db,
+                        "using_cached_data": using_cached_data or cached.get("using_cached_data", False),
+                    }
+                )
+        finally:
+            session.close()
+
+        scraped_times = [
+            s["last_scraped_at"]
+            for s in sources_summary
+            if s.get("last_scraped_at")
+        ]
+        overall_last = max(scraped_times) if scraped_times else None
+
+        return {
+            "overall_last_scraped_at": overall_last,
+            "last_automation_run_at": cache.get("last_automation_run_at"),
+            "data_from_cache": any(s.get("using_cached_data") for s in sources_summary),
+            "sources": sources_summary,
+        }
+
     def log_scrape_start(
         self, source: str, city: str = ""
     ) -> int:
