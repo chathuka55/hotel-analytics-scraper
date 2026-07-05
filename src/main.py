@@ -10,6 +10,7 @@ import click
 from src.config.settings import get_settings
 from src.monitoring.logger import configure_logging, get_logger
 from src.monitoring.metrics import get_metrics
+from src.config.sources_registry import ALL_SOURCES
 from src.scrapers.runner import run_source_scrape
 from src.storage import CSVStorage, DatabaseStorage, JSONStorage, init_db
 from src.utils.proxies import ProxyRotator
@@ -41,8 +42,9 @@ logger = get_logger(__name__)
 def cli(ctx, env, debug, storage, database_url):
     """Hotel Check-in Data Scraper CLI.
 
-    Scrape hotel data from Booking.com, Agoda, Expedia, SLTDA, and data.gov.lk
-    to analyze which hotels have the most check-ins each month.
+    Scrape hotel data from Booking.com, Agoda, Expedia, Skyscanner, Rehlat,
+    Traveloka, TripAdvisor, Trip.com, GoSeek, Etrip, Hotels.com, SLTDA,
+    and data.gov.lk to analyze which hotels have the most check-ins each month.
     """
     # Initialize context
     ctx.ensure_object(dict)
@@ -88,9 +90,7 @@ def get_proxy_rotator():
 @cli.command()
 @click.option(
     "--source",
-    type=click.Choice(
-        ["booking", "agoda", "expedia", "sltda", "datagovlk", "all"]
-    ),
+    type=click.Choice(list(ALL_SOURCES) + ["all"]),
     required=True,
     help="Source to scrape",
 )
@@ -141,7 +141,7 @@ def scrape(
 
     sources_to_scrape = []
     if source == "all":
-        sources_to_scrape = ["booking", "agoda", "expedia", "sltda", "datagovlk"]
+        sources_to_scrape = list(ALL_SOURCES)
     else:
         sources_to_scrape = [source]
 
@@ -352,12 +352,24 @@ def init_db(ctx):
         click.echo(f"Error: {e}", err=True)
 
 
+@cli.command("purge-unknown")
+@click.pass_context
+def purge_unknown(ctx):
+    """Remove unknown/incomplete records from the database."""
+    storage = get_storage(ctx)
+    if not hasattr(storage, "purge_unknown_records"):
+        click.echo("purge-unknown requires database storage", err=True)
+        return
+    count = storage.purge_unknown_records()
+    click.echo(f"Purged {count} unknown/incomplete records")
+
+
 @cli.command()
 def version():
     """Show version information."""
-    click.echo("Hotel Scraper v1.0.0")
+    click.echo("Hotel Scraper v2.0.0")
     click.echo("Python 3.10+")
-    click.echo("Sources: Booking.com, Agoda, Expedia, SLTDA, data.gov.lk")
+    click.echo(f"Sources: {', '.join(ALL_SOURCES)}")
 
 
 # --- Main Entry Point ---

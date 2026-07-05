@@ -1,28 +1,21 @@
 """Expedia.com scraper implementation."""
 
-import json
-import time
 from datetime import date
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote_plus
 
-from bs4 import BeautifulSoup
-
 from src.config.settings import get_settings
-from src.monitoring.logger import get_logger
-from src.scrapers.base import BaseScraper
+from src.scrapers.travel import TravelSiteScraper
 from src.storage.base import BaseStorage
+from src.utils.city_ids import EXPEDIA_REGION_IDS, lookup_city_id
 from src.utils.proxies import ProxyRotator
 
-logger = get_logger(__name__)
 
+class ExpediaScraper(TravelSiteScraper):
+    """Scraper for Expedia.com hotel data."""
 
-class ExpediaScraper(BaseScraper):
-    """Scraper for Expedia.com hotel data.
-
-    Expedia also uses JavaScript rendering, so Playwright
-    is recommended for consistent results.
-    """
+    playwright_default = True
+    page_size = 25
 
     def __init__(
         self,
@@ -38,112 +31,60 @@ class ExpediaScraper(BaseScraper):
         checkin_date: date,
         checkout_date: date,
         adults: int = 2,
-        children: List[int] = None,
-        start_index: int = 0,
+        offset: int = 0,
+        **kwargs,
     ) -> str:
-        """Build Expedia search URL.
-
-        Args:
-            city: Destination city
-            checkin_date: Check-in date
-            checkout_date: Check-out date
-            adults: Number of adults
-            children: List of children ages
-            start_index: Pagination start index
-
-        Returns:
-            Complete search URL
-        """
         date_fmt = "%Y-%m-%d"
-
-        # Expedia uses a path-based search
-        destination = quote_plus(city)
+        destination = quote_plus(f"{city}, Sri Lanka")
+        region_id = self.get_region_id(city)
 
         params = {
             "startDate": checkin_date.strftime(date_fmt),
             "endDate": checkout_date.strftime(date_fmt),
             "adults": adults,
-            "startIndex": start_index,
+            "startIndex": offset,
         }
+        if region_id:
+            params["regionId"] = region_id
+        else:
+            params["destination"] = destination
 
         query = "&".join(f"{k}={quote_plus(str(v))}" for k, v in params.items())
-        return (
-            f"{self.base_url}/Hotel-Search?"
-            f"destination={destination}&{query}"
-        )
+        return f"{self.base_url}/Hotel-Search?{query}"
 
-    def scrape(
+    def enrich_results(
         self,
+        results: List[Dict[str, Any]],
         city: str,
         checkin_date: date,
         checkout_date: date,
-        max_pages: int = 5,
-        use_playwright: bool = True,
-        **kwargs,
     ) -> List[Dict[str, Any]]:
-        """Scrape Expedia for hotel data.
+        """Backfill from GraphQL when HTML results lack pricing."""
+        if results and all(r.get("nightly_rate") for r in results):
+            return results
 
-        Args:
-            city: City to search
-            checkin_date: Check-in date
-            checkout_date: Check-out date
-            max_pages: Maximum pages to scrape
-            use_playwright: Use browser automation
-            **kwargs: Additional parameters
+        region_id = self.get_region_id(city)
+        if not region_id:
+            return results
 
-        Returns:
-            List of hotel records
-        """
-        all_results = []
-        start_index = 0
-
-        self.logger.info(
-            f"Starting Expedia scrape: {city}, "
-            f"{checkin_date} to {checkout_date}"
+        api_rows = self.scrape_graphql_api(
+            region_id, checkin_date, checkout_date
         )
+        if not api_rows:
+            return results
 
-        for page in range(max_pages):
-            self.logger.info(f"Fetching page {page + 1}/{max_pages}")
-
-            url = self.build_search_url(
-                city, checkin_date, checkout_date, start_index=start_index
-            )
-
-            try:
-                if use_playwright:
-                    html = self.fetch_page_playwright(
-                        url,
-                        wait_for=".uitk-card",
-                        timeout=45000,
-                    )
-                else:
-                    html = self.fetch_page(url)
-
-                results = self.parse_results(
-                    html, city, checkin_date, checkout_date
-                )
-
-                if not results:
-                    self.logger.info("No more results found")
-                    break
-
-                all_results.extend(results)
-                self.logger.info(
-                    f"Page {page + 1}: Found {len(results)} hotels"
-                )
-
-                start_index += 25
-                time.sleep(2)
-
-            except Exception as e:
-                self.logger.error(f"Error on page {page + 1}: {e}")
-                break
-
-        if all_results:
-            self.save_results(all_results)
-
-        self.logger.info(f"Expedia scrape complete: {len(all_results)} hotels")
-        return all_results
+        api_by_name = {
+            (r.get("hotel_name") or "").lower(): r for r in api_rows
+        }
+        for row in results:
+            key = (row.get("hotel_name") or "").lower()
+            if key in api_by_name:
+                extra = api_by_name[key]
+                row.setdefault("nightly_rate", extra.get("nightly_rate", 0))
+                row.setdefault("currency", extra.get("currency", "USD"))
+                row.setdefault("guest_score", extra.get("guest_score", 0))
+                row.setdefault("review_count", extra.get("review_count", 0))
+        return results
 
     def scrape_graphql_api(
         self,
@@ -151,20 +92,7 @@ class ExpediaScraper(BaseScraper):
         checkin_date: date,
         checkout_date: date,
     ) -> List[Dict[str, Any]]:
-        """Use Expedia's GraphQL API for data extraction.
-
-        More reliable than HTML scraping when available.
-
-        Args:
-            region_id: Expedia region/city ID
-            checkin_date: Check-in date
-            checkout_date: Check-out date
-
-        Returns:
-            List of hotel records
-        """
         api_url = f"{self.base_url}/graphql"
-
         query = {
             "operationName": "PropertySearch",
             "variables": {
@@ -194,11 +122,13 @@ class ExpediaScraper(BaseScraper):
                 "resultsSize": 25,
                 "resultsStartingIndex": 0,
             },
-            "query": "query PropertySearch($context: ContextInput, $criteria: CriteriaInput, "
-            "$resultsStartingIndex: Int, $resultsSize: Int) { propertySearch(context: $context, "
-            "criteria: $criteria, resultsStartingIndex: $resultsStartingIndex, "
-            "resultsSize: $resultsSize) { properties { propertyId name price { lead { amount } } "
-            "reviews { score total } } } }",
+            "query": (
+                "query PropertySearch($context: ContextInput, $criteria: CriteriaInput, "
+                "$resultsStartingIndex: Int, $resultsSize: Int) { propertySearch(context: $context, "
+                "criteria: $criteria, resultsStartingIndex: $resultsStartingIndex, "
+                "resultsSize: $resultsSize) { properties { propertyId name price { lead { amount } } "
+                "reviews { score total } } } }"
+            ),
         }
 
         try:
@@ -207,125 +137,36 @@ class ExpediaScraper(BaseScraper):
                 json=query,
                 headers={"Content-Type": "application/json"},
             )
-
             if response.status_code == 200:
-                data = response.json()
-                return self._parse_graphql_response(data)
-            else:
-                logger.warning(f"GraphQL API returned {response.status_code}")
-                return []
-
+                return self._parse_graphql_response(response.json())
         except Exception as e:
-            logger.error(f"GraphQL API failed: {e}")
-            return []
+            self.logger.debug(f"Expedia GraphQL fallback failed: {e}")
+        return []
 
     def _parse_graphql_response(self, data: Dict) -> List[Dict[str, Any]]:
-        """Parse GraphQL API response.
-
-        Args:
-            data: API response
-
-        Returns:
-            List of hotel records
-        """
         results = []
-
         properties = (
             data.get("data", {})
             .get("propertySearch", {})
             .get("properties", [])
         )
-
         for prop in properties:
             try:
                 reviews = prop.get("reviews", {})
                 price = prop.get("price", {}).get("lead", {})
-
-                hotel = {
-                    "source": "expedia",
-                    "hotel_name": prop.get("name", ""),
-                    "guest_score": reviews.get("score", 0),
-                    "review_count": reviews.get("total", 0),
-                    "nightly_rate": price.get("amount", 0),
-                    "currency": "USD",
-                }
-                results.append(hotel)
+                results.append(
+                    {
+                        "source": "expedia",
+                        "hotel_name": prop.get("name", ""),
+                        "guest_score": reviews.get("score", 0),
+                        "review_count": reviews.get("total", 0),
+                        "nightly_rate": price.get("amount", 0),
+                        "currency": "USD",
+                    }
+                )
             except Exception as e:
-                logger.debug(f"Failed to parse property: {e}")
-                continue
-
+                self.logger.debug(f"Failed to parse Expedia property: {e}")
         return results
 
     def get_region_id(self, city: str) -> Optional[str]:
-        """Get Expedia region ID for a city.
-
-        Args:
-            city: City name
-
-        Returns:
-            Region ID or None
-        """
-        region_ids = {
-            "colombo": "6056893",
-            "kandy": "6057007",
-            "galle": "6057123",
-            "negombo": "6056894",
-            "nuwara eliya": "6057124",
-            "bentota": "6057125",
-            "sigiriya": "6057008",
-            "ella": "6057126",
-            "mirissa": "6057127",
-            "trincomalee": "6057128",
-            "jaffna": "6057129",
-            "anuradhapura": "6057009",
-            "dambulla": "6057010",
-            "hikkaduwa": "6057130",
-            "unawatuna": "6057131",
-        }
-
-        return region_ids.get(city.lower().strip())
-
-    def scrape_with_monthly_dates(
-        self,
-        city: str,
-        year: int,
-        month: int,
-        max_pages: int = 3,
-    ) -> List[Dict[str, Any]]:
-        """Scrape Expedia for a specific month.
-
-        Args:
-            city: City name
-            year: Year
-            month: Month (1-12)
-            max_pages: Max pages per scrape
-
-        Returns:
-            Combined results
-        """
-        from calendar import monthrange
-
-        _, last_day = monthrange(year, month)
-        all_results = []
-
-        for day in range(1, min(last_day + 1, 8)):
-            checkin = date(year, month, day)
-            checkout = date(year, month, min(day + 1, last_day))
-
-            self.logger.info(f"Expedia: Scraping check-in {checkin}")
-
-            try:
-                results = self.scrape(
-                    city=city,
-                    checkin_date=checkin,
-                    checkout_date=checkout,
-                    max_pages=max_pages,
-                    use_playwright=True,
-                )
-                all_results.extend(results)
-                time.sleep(3)
-            except Exception as e:
-                self.logger.error(f"Expedia error on {checkin}: {e}")
-                continue
-
-        return all_results
+        return lookup_city_id(EXPEDIA_REGION_IDS, city)

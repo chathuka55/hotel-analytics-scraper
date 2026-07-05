@@ -3,41 +3,24 @@
 from fastapi import APIRouter
 
 from src.api.schemas import SourceInfo
+from src.config.sources_registry import (
+    ALL_SOURCES,
+    PLAYWRIGHT_DEFAULT_SOURCES,
+    SOURCE_LABELS,
+    SOURCE_LEGAL_NOTES,
+)
 from src.scrapers.booking import BookingScraper
 
 router = APIRouter(prefix="/api/meta", tags=["meta"])
 
 _SOURCES = [
     SourceInfo(
-        id="booking",
-        label="Booking.com",
-        requires_playwright=False,
-        legal_note="Commercial site. Respect robots.txt and rate limits.",
-    ),
-    SourceInfo(
-        id="agoda",
-        label="Agoda",
-        requires_playwright=True,
-        legal_note="Commercial site, JS-heavy. Respect robots.txt and rate limits.",
-    ),
-    SourceInfo(
-        id="expedia",
-        label="Expedia",
-        requires_playwright=True,
-        legal_note="Commercial site. Respect robots.txt and rate limits.",
-    ),
-    SourceInfo(
-        id="sltda",
-        label="SLTDA (Sri Lanka Tourism Development Authority)",
-        requires_playwright=False,
-        legal_note="Government tourism statistics. Public & legal to scrape.",
-    ),
-    SourceInfo(
-        id="datagovlk",
-        label="data.gov.lk",
-        requires_playwright=False,
-        legal_note="Open government data portal. Public & legal to scrape.",
-    ),
+        id=source_id,
+        label=SOURCE_LABELS.get(source_id, source_id.title()),
+        requires_playwright=source_id in PLAYWRIGHT_DEFAULT_SOURCES,
+        legal_note=SOURCE_LEGAL_NOTES.get(source_id, ""),
+    )
+    for source_id in ALL_SOURCES
 ]
 
 

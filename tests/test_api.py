@@ -68,7 +68,7 @@ def test_monthly_stats(client, test_db_url, sample_hotel_records):
 
 def test_meta_sources_and_cities(client):
     sources = client.get("/api/meta/sources").json()
-    assert {"sltda", "datagovlk"}.issubset({s["id"] for s in sources})
+    assert {"google", "sltda"}.issubset({s["id"] for s in sources})
 
     cities = client.get("/api/meta/cities").json()
     assert "Colombo" in cities

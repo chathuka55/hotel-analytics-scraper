@@ -2,9 +2,78 @@
 
 import re
 from datetime import date, datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from pydantic import BaseModel, Field, field_validator, model_validator
+
+from src.config.sources_registry import VALID_SOURCES, is_travel_source
+from src.utils.location import normalize_city
+
+JUNK_HOTEL_NAMES: Set[str] = {
+    "",
+    "unknown",
+    "n/a",
+    "na",
+    "none",
+    "null",
+    "-",
+    "—",
+    "not available",
+    "unnamed",
+}
+
+
+def is_junk_record(data: Dict[str, Any]) -> bool:
+    """Return True if a record should be discarded (unknown/incomplete)."""
+    source = (data.get("source") or "").lower().strip()
+    if not source or source == "unknown" or source not in VALID_SOURCES:
+        return True
+
+    name = (data.get("hotel_name") or "").strip().lower()
+    if name in JUNK_HOTEL_NAMES:
+        return True
+
+    city = (data.get("city") or "").strip()
+    if not city or city.lower() in JUNK_HOTEL_NAMES:
+        return True
+
+    # data.gov.lk rows are dataset metadata, not individual hotels.
+    if source == "datagovlk":
+        return True
+
+    # SLTDA tourist-arrival rows have no hotel identity.
+    record_type = data.get("record_type") or ""
+    if source == "sltda" and record_type in ("tourist_arrival", "monthly_report", "generic", "revenue"):
+        return True
+
+    # SLTDA occupancy without a hotel name is regional stats, not a hotel row.
+    if source == "sltda" and record_type == "hotel_occupancy":
+        if name in JUNK_HOTEL_NAMES or not data.get("hotel_name"):
+            return True
+
+    # Travel OTAs: require verified location (never save search-city guesses).
+    if is_travel_source(source):
+        if not data.get("location_verified"):
+            return True
+        if not data.get("city"):
+            return True
+
+    return False
+
+
+def filter_scraped_records(
+    records: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Remove junk/unknown records and normalize city names before save."""
+    cleaned: List[Dict[str, Any]] = []
+    for record in records:
+        if is_junk_record(record):
+            continue
+        record = dict(record)
+        if record.get("city"):
+            record["city"] = normalize_city(record["city"])
+        cleaned.append(record)
+    return cleaned
 
 
 class HotelCheckin(BaseModel):
@@ -14,7 +83,7 @@ class HotelCheckin(BaseModel):
     """
 
     hotel_name: str = Field(..., min_length=1, max_length=500)
-    source: str = Field(..., pattern=r"^(booking|agoda|expedia|sltda|datagovlk)$")
+    source: str = Field(..., min_length=1, max_length=50)
     city: str = Field(..., min_length=1, max_length=200)
     country: str = Field(default="Sri Lanka", min_length=1, max_length=200)
     checkin_date: date
@@ -28,6 +97,25 @@ class HotelCheckin(BaseModel):
     review_count: int = Field(default=0, ge=0)
     scraped_at: datetime = Field(default_factory=datetime.utcnow)
     url: str = Field(default="", max_length=2000)
+    address: str = Field(default="", max_length=500)
+
+    @field_validator("source")
+    @classmethod
+    def validate_source(cls, v: str) -> str:
+        """Validate source is a known scraper."""
+        v_lower = v.lower().strip()
+        if v_lower not in VALID_SOURCES:
+            raise ValueError(f"Invalid source: {v}")
+        return v_lower
+
+    @field_validator("city")
+    @classmethod
+    def normalize_city_field(cls, v: str) -> str:
+        """Normalize city to canonical form."""
+        normalized = normalize_city(v)
+        if not normalized:
+            raise ValueError("city cannot be empty")
+        return normalized
 
     @field_validator("hotel_name")
     @classmethod
@@ -97,6 +185,7 @@ class HotelCheckin(BaseModel):
             "review_count": self.review_count,
             "scraped_at": self.scraped_at.isoformat(),
             "url": self.url,
+            "address": self.address,
         }
 
     @property
@@ -173,10 +262,11 @@ def validate_hotel_data(data: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
         if field not in data or not data[field]:
             return False, f"Missing required field: {field}"
 
-    # Validate source
-    valid_sources = {"booking", "agoda", "expedia", "sltda", "datagovlk"}
-    if data.get("source", "").lower() not in valid_sources:
+    if data.get("source", "").lower() not in VALID_SOURCES:
         return False, f"Invalid source: {data.get('source')}"
+
+    if is_junk_record(data):
+        return False, "Record is incomplete or unknown"
 
     # Validate dates
     try:

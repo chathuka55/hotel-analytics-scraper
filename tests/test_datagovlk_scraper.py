@@ -113,14 +113,27 @@ class TestDataGovLkScraper:
                 "id": "ds1",
                 "title": "Test Dataset",
                 "notes": "Test data",
-                "resources": [],
+                "resources": [
+                    {
+                        "id": "res1",
+                        "name": "hotels.csv",
+                        "format": "CSV",
+                        "url": "https://example.com/hotels.csv",
+                    }
+                ],
                 "tags": [],
             },
         }
 
+        preview_response = MagicMock()
+        preview_response.text = "name,rooms\nHotel A,100"
+        preview_response.status_code = 200
+
         def mock_get(url, **kwargs):
             if "package_search" in url:
                 return search_response
+            if "example.com" in url:
+                return preview_response
             return detail_response
 
         scraper.session_manager.get = mock_get
@@ -169,6 +182,7 @@ class TestDataGovLkScraper:
 
         mock_response = MagicMock()
         mock_response.text = html
+        mock_response.status_code = 200
         scraper.session_manager.get = MagicMock(return_value=mock_response)
 
         results = scraper._scrape_html_fallback("tourism")

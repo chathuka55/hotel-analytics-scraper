@@ -14,6 +14,7 @@ booking:
   hotel_review_count: "div[data-testid='review-score'] abbr"
   hotel_price: "span[data-testid='price-and-discounted-price']"
   hotel_location: "span[data-testid='address']"
+  hotel_city: "span[data-testid='address']"
   hotel_image: "img[data-testid='image']"
   hotel_availability: "div[data-testid='availability-cta']"
   next_page_button: "button[aria-label='Next page']"
@@ -57,7 +58,8 @@ expedia:
   hotel_score: "span.uitk-text.has-text-theme"
   hotel_review_count: "span.uitk-text.uitk-type-300"
   hotel_price: "div.uitk-text.has-text-theme-economy"
-  hotel_location: "div.uitk-text.uitk-type-300.uitk-text-default-theme"
+  hotel_location: "div.uitk-text[data-testid='property-address'], span[data-stid='location'], span[data-testid='address']"
+  hotel_city: "span[data-stid='location']"
   hotel_image: "img.uitk-image-media"
   hotel_urgency: "div.uitk-phasing-indicator"
   next_page_button: "button[aria-label='Go to the next page']"
@@ -102,3 +104,134 @@ datagovlk:
   resource_table: "table.resources"
   resource_download: "a.resource-url-analytics"
   api_endpoint: "a.endpoint-link"
+
+# --- Skyscanner Hotels Selectors ---
+skyscanner:
+  search_result_item: "div[data-testid='property-card'], li[data-testid='hotel-card'], div.HotelCard"
+  hotel_name: "h2, h3, [data-testid='hotel-name']"
+  hotel_url: "a[href*='/hotels/']"
+  hotel_score: "[data-testid='review-score'], span[class*='Rating']"
+  hotel_review_count: "[data-testid='review-count'], span[class*='review']"
+  hotel_price: "[data-testid='price'], span[class*='Price']"
+  hotel_location: "[data-testid='address'], span[class*='Address'], p[class*='location']"
+  next_page_button: "button[aria-label*='Next'], a[aria-label*='Next']"
+
+  detail_hotel_name: "h1"
+  detail_address: "[data-testid='address'], span[class*='address']"
+
+# --- Rehlat Selectors ---
+rehlat:
+  search_result_item: "div.hotel-card, div[class*='HotelCard'], li[class*='hotel']"
+  hotel_name: "h3, h4, [class*='hotel-name'], [class*='HotelName']"
+  hotel_url: "a[href*='/hotel'], a[href*='/hotels/']"
+  hotel_score: "[class*='rating'], [class*='score'], span[class*='star']"
+  hotel_review_count: "[class*='review']"
+  hotel_price: "[class*='price'], span[class*='Price']"
+  hotel_location: "[class*='location'], [class*='address'], span[class*='city']"
+  hotel_city: "[class*='city-name']"
+  next_page_button: "a[class*='next'], button[class*='next']"
+
+  detail_hotel_name: "h1"
+  detail_address: "[class*='address']"
+
+# --- Traveloka Selectors ---
+traveloka:
+  search_result_item: "div[data-testid='hotel-card'], div[class*='HotelCard'], article[class*='hotel']"
+  hotel_name: "h3, h4, [data-testid='hotel-name']"
+  hotel_url: "a[href*='/hotel/']"
+  hotel_score: "[data-testid='rating'], span[class*='rating']"
+  hotel_review_count: "[data-testid='review-count'], span[class*='review']"
+  hotel_price: "[data-testid='price'], span[class*='price']"
+  hotel_location: "[data-testid='location'], span[class*='location'], p[class*='address']"
+  hotel_city: "[data-testid='area']"
+  next_page_button: "button[aria-label*='Next'], a[class*='pagination-next']"
+
+  detail_hotel_name: "h1[data-testid='hotel-name']"
+  detail_address: "[data-testid='hotel-address']"
+
+# --- TripAdvisor Selectors ---
+tripadvisor:
+  search_result_item: "div[data-test-target='hotels-list-item'], div.listing, div.property_card"
+  hotel_name: "a[data-test-target='top-rated'], div.listing_title a, h3"
+  hotel_url: "a[href*='/Hotel_Review']"
+  hotel_score: "span[class*='ui_bubble_rating'], svg[class*='bubble'] + span, span[class*='rating']"
+  hotel_review_count: "span[class*='review_count'], a[class*='review']"
+  hotel_price: "div[data-test-target='price'], span[class*='price']"
+  hotel_location: "span[class*='address'], div[class*='location'], a[class*='address']"
+  next_page_button: "a.ui_button.nav.next, a[class*='next']"
+
+  detail_hotel_name: "h1[data-test-target='top-info-header']"
+  detail_address: "span[data-test-target='address']"
+
+# --- Trip.com Selectors ---
+tripcom:
+  search_result_item: "div.list-item, div[class*='hotel-item'], li[class*='hotel']"
+  hotel_name: "h2, h3, span[class*='hotelName'], a[class*='name']"
+  hotel_url: "a[href*='/hotels/'], a[href*='hotelDetail']"
+  hotel_score: "span[class*='score'], div[class*='rating']"
+  hotel_review_count: "span[class*='comment'], span[class*='review']"
+  hotel_price: "span[class*='price'], div[class*='Price']"
+  hotel_location: "span[class*='address'], p[class*='location'], span[class*='area']"
+  hotel_city: "span[class*='city']"
+  next_page_button: "a[class*='next'], button[class*='next']"
+
+  detail_hotel_name: "h1.hotel-name, h1"
+  detail_address: "span.hotel-address, p[class*='address']"
+
+# --- GoSeek Selectors ---
+goseek:
+  search_result_item: "div.hotel-result, div[class*='HotelCard'], li[class*='result']"
+  hotel_name: "h3, h4, a[class*='hotel-name']"
+  hotel_url: "a[href*='/hotel']"
+  hotel_score: "span[class*='rating'], div[class*='score']"
+  hotel_review_count: "span[class*='reviews']"
+  hotel_price: "span[class*='price'], div[class*='rate']"
+  hotel_location: "span[class*='location'], p[class*='address']"
+  next_page_button: "a[class*='next'], button[aria-label*='Next']"
+
+  detail_hotel_name: "h1"
+  detail_address: "span[class*='address']"
+
+# --- Etrip Selectors ---
+etrip:
+  search_result_item: "div[class*='hotel-card'], div[class*='HotelCard'], article[class*='property']"
+  hotel_name: "h2, h3, [class*='hotel-name']"
+  hotel_url: "a[href*='/hotel']"
+  hotel_score: "[class*='rating'], [class*='score']"
+  hotel_review_count: "[class*='review']"
+  hotel_price: "[class*='price']"
+  hotel_location: "[class*='location'], [class*='address']"
+  next_page_button: "a[class*='next'], button[class*='next']"
+
+  detail_hotel_name: "h1"
+  detail_address: "[class*='address']"
+
+# --- Hotels.com Selectors ---
+hotelscom:
+  search_result_item: "div.uitk-card, section[data-stid='property-listing-results'] div.uitk-card"
+  hotel_name: "h3.uitk-heading, h3"
+  hotel_url: "a.uitk-card-link"
+  hotel_score: "span.uitk-badge, span[class*='review-score']"
+  hotel_review_count: "span.uitk-text.uitk-type-300"
+  hotel_price: "div.uitk-text.has-text-theme-economy, span[data-stid='price-summary']"
+  hotel_location: "div.uitk-text[data-testid='property-address'], span[data-stid='location'], span[data-testid='address']"
+  hotel_city: "span[data-stid='location']"
+  next_page_button: "button[aria-label='Go to the next page']"
+
+  detail_hotel_name: "h1.uitk-heading"
+  detail_address: "div.uitk-text[data-testid='property-address']"
+
+# --- Google Hotels Selectors ---
+google:
+  search_result_item: "a[href*='travel/hotels'], div[data-hveid]"
+  hotel_name: "span, h3"
+  hotel_url: "a[href*='travel/hotels']"
+  hotel_score: "span[aria-label*='star'], span[aria-label*='rating']"
+  hotel_review_count: "span[aria-label*='review']"
+  hotel_price: "span[aria-label*='price'], span[class*='price']"
+  hotel_location: "span[aria-label*='address'], span[class*='address']"
+  hotel_city: "span[aria-label*='location']"
+  next_page_button: "button[aria-label*='Next']"
+
+  detail_hotel_name: "h1"
+  detail_address: "span[aria-label*='Address']"

@@ -29,6 +29,7 @@ export interface HotelRecord {
   available_rooms: number
   occupancy_pct: number
   room_type: string
+  address?: string
   guest_score: number
   review_count: number
   scraped_at: string | null
@@ -72,6 +73,31 @@ export interface ScrapeJobStatus {
   duration_seconds: number | null
 }
 
+export interface RatedHotel {
+  hotel_name: string
+  city: string
+  avg_guest_score: number
+  avg_nightly_rate: number
+  review_count: number
+  checkin_count: number
+  value_score: number | null
+}
+
+export interface Overview {
+  total_records: number
+  total_hotels: number
+  total_cities: number
+  avg_nightly_rate: number
+  min_nightly_rate: number
+  max_nightly_rate: number
+  avg_guest_score: number
+  by_source: Record<string, number>
+  most_checkins: TopHotel | null
+  cheapest: HotelRecord | null
+  best_rated: RatedHotel | null
+  best_value: RatedHotel | null
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
     headers: { 'Content-Type': 'application/json' },
@@ -97,6 +123,18 @@ export const api = {
   getMonthlyStats: (params: { city?: string; year?: number }) =>
     request<MonthlyStats>(`/api/stats/monthly${qs(params)}`),
 
+  getOverview: (params: { city?: string }) =>
+    request<Overview>(`/api/stats/overview${qs(params)}`),
+
+  getCheapest: (params: { city?: string; min_score?: number; limit?: number }) =>
+    request<HotelRecord[]>(`/api/hotels/cheapest${qs(params)}`),
+
+  getBestRated: (params: { city?: string; min_reviews?: number; limit?: number }) =>
+    request<RatedHotel[]>(`/api/hotels/best-rated${qs(params)}`),
+
+  getBestValue: (params: { city?: string; limit?: number }) =>
+    request<RatedHotel[]>(`/api/hotels/best-value${qs(params)}`),
+
   getHotels: (params: { source?: string; city?: string; limit?: number; offset?: number }) =>
     request<HotelListResponse>(`/api/hotels${qs(params)}`),
 
@@ -111,4 +149,7 @@ export const api = {
     }),
 
   getScrapeStatus: (logId: number) => request<ScrapeJobStatus>(`/api/scrape/${logId}`),
+
+  getScrapeHistory: (params: { source?: string; limit?: number }) =>
+    request<ScrapeJobStatus[]>(`/api/scrape/history${qs(params)}`),
 }
