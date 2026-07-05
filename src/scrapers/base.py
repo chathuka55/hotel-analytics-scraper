@@ -14,6 +14,7 @@ from src.storage.csv_storage import CSVStorage
 from src.utils.proxies import ProxyRotator
 from src.utils.rate_limiter import RateLimiter
 from src.utils.retry import with_retry
+from src.utils.validators import filter_scraped_records
 from src.utils.session import SessionManager
 
 logger = get_logger(__name__)
@@ -261,6 +262,10 @@ class BaseScraper(ABC):
         Returns:
             Number of records saved
         """
+        if not records:
+            return 0
+
+        records = filter_scraped_records(records)
         if not records:
             return 0
 

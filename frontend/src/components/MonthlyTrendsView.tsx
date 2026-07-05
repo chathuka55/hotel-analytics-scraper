@@ -1,26 +1,22 @@
 import { useEffect, useState } from 'react'
 import {
-  Bar,
-  BarChart,
+  Area,
+  AreaChart,
   CartesianGrid,
+  Line,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts'
 import { api, type MonthlyStats } from '../api/client'
+import { Card, Empty, ErrorBox, Loading, monthLabel } from './ui'
 
-export function MonthlyTrendsView() {
-  const [cities, setCities] = useState<string[]>([])
-  const [city, setCity] = useState('')
+export function MonthlyTrendsView({ city }: { city: string }) {
   const [year, setYear] = useState('')
   const [stats, setStats] = useState<MonthlyStats | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    api.getCities().then(setCities).catch(() => {})
-  }, [])
 
   useEffect(() => {
     setLoading(true)
@@ -35,75 +31,67 @@ export function MonthlyTrendsView() {
   const chartData = stats
     ? Object.entries(stats.monthly_totals)
         .sort(([a], [b]) => a.localeCompare(b))
-        .map(([month, count]) => ({
-          month,
+        .map(([m, count]) => ({
+          month: monthLabel(m),
           checkins: count,
-          hotels: stats.unique_hotels_per_month[month] ?? 0,
+          hotels: stats.unique_hotels_per_month[m] ?? 0,
         }))
     : []
 
   return (
     <div>
-      <h2>Monthly Check-in Trends</h2>
-      <div style={{ display: 'flex', gap: 12, margin: '16px 0' }}>
-        <label>
-          City
-          <select value={city} onChange={(e) => setCity(e.target.value)}>
-            <option value="">All cities</option>
-            {cities.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Year
-          <input
-            type="number"
-            placeholder="e.g. 2026"
-            value={year}
-            onChange={(e) => setYear(e.target.value)}
-            style={{ width: 90 }}
-          />
-        </label>
+      <div className="grid grid-3 section">
+        <Stat label="Total check-ins" value={stats?.total_checkins ?? 0} icon="📈" />
+        <Stat label="Unique hotels" value={stats?.total_unique_hotels ?? 0} icon="🏨" />
+        <Stat label="Cities" value={stats?.total_cities ?? 0} icon="📍" />
       </div>
 
-      {loading && <p>Loading...</p>}
-      {error && <p style={{ color: 'var(--danger)' }}>{error}</p>}
+      <Card title="Check-in trend by month">
+        <div className="filters">
+          <label className="field">
+            Year
+            <input type="number" placeholder="All years" value={year} onChange={(e) => setYear(e.target.value)} style={{ width: 120 }} />
+          </label>
+        </div>
 
-      {stats && (
-        <>
-          <div style={{ display: 'flex', gap: 24, margin: '12px 0 24px' }}>
-            <Stat label="Total check-ins" value={stats.total_checkins} />
-            <Stat label="Unique hotels" value={stats.total_unique_hotels} />
-            <Stat label="Cities" value={stats.total_cities} />
-          </div>
-
-          {chartData.length === 0 ? (
-            <p>No data found. Run a scrape first, or seed sample data.</p>
-          ) : (
-            <ResponsiveContainer width="100%" height={320}>
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="checkins" fill="#1c7c54" name="Check-ins" />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </>
-      )}
+        {loading ? (
+          <Loading />
+        ) : error ? (
+          <ErrorBox message={error} />
+        ) : chartData.length === 0 ? (
+          <Empty />
+        ) : (
+          <ResponsiveContainer width="100%" height={340}>
+            <AreaChart data={chartData} margin={{ top: 10, right: 12, left: -12, bottom: 0 }}>
+              <defs>
+                <linearGradient id="fillCheckins" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#2dd4a7" stopOpacity={0.5} />
+                  <stop offset="100%" stopColor="#2dd4a7" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#243150" vertical={false} />
+              <XAxis dataKey="month" stroke="#6b7aa0" fontSize={12} tickLine={false} axisLine={false} />
+              <YAxis stroke="#6b7aa0" fontSize={12} tickLine={false} axisLine={false} />
+              <Tooltip
+                cursor={{ stroke: '#38bdf8', strokeWidth: 1 }}
+                contentStyle={{ background: '#18223b', border: '1px solid #243150', borderRadius: 10, color: '#e7ecf6' }}
+              />
+              <Area type="monotone" dataKey="checkins" stroke="#2dd4a7" strokeWidth={2.5} fill="url(#fillCheckins)" name="Check-ins" />
+              <Line type="monotone" dataKey="hotels" stroke="#a78bfa" strokeWidth={2} dot={false} name="Unique hotels" />
+            </AreaChart>
+          </ResponsiveContainer>
+        )}
+      </Card>
     </div>
   )
 }
 
-function Stat({ label, value }: { label: string; value: number }) {
+function Stat({ label, value, icon }: { label: string; value: number; icon: string }) {
   return (
-    <div>
-      <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{label}</div>
-      <div style={{ fontSize: 24, fontWeight: 600 }}>{value}</div>
+    <div className="card kpi">
+      <span className="spark">{icon}</span>
+      <div className="label">{label}</div>
+      <div className="value">{value.toLocaleString()}</div>
     </div>
   )
 }

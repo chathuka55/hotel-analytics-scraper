@@ -48,6 +48,8 @@ def sample_hotel_data():
         "review_count": 1250,
         "scraped_at": datetime.utcnow(),
         "url": "https://www.booking.com/hotel/lk/cinnamon-grand-colombo",
+        "location_verified": True,
+        "address": "77 Galle Road, Colombo",
     }
 
 
@@ -71,6 +73,8 @@ def sample_hotel_records():
             "review_count": 890,
             "scraped_at": datetime.utcnow(),
             "url": "https://www.booking.com/hotel/lk/shangri-la",
+            "location_verified": True,
+            "address": "1 Galle Face, Colombo",
         },
         {
             "hotel_name": "Heritance Kandalama",
@@ -88,6 +92,8 @@ def sample_hotel_records():
             "review_count": 2100,
             "scraped_at": datetime.utcnow(),
             "url": "https://www.agoda.com/heritance-kandalama",
+            "location_verified": True,
+            "address": "Dambulla, Sri Lanka",
         },
         {
             "hotel_name": "The Fortress Resort",
@@ -105,6 +111,8 @@ def sample_hotel_records():
             "review_count": 450,
             "scraped_at": datetime.utcnow(),
             "url": "https://www.expedia.com/hotel/lk/fortress",
+            "location_verified": True,
+            "address": "Galle, Sri Lanka",
         },
     ]
 

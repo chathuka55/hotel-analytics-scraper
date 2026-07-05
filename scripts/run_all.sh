@@ -13,13 +13,16 @@ echo "Hotel Scraper - Running All Sources"
 echo "Started: $(date)"
 echo "=========================================="
 
-# Load environment variables
 if [ -f .env ]; then
     source .env
 fi
 
 PYTHON="${PYTHON:-python}"
-SOURCES=("booking" "agoda" "expedia" "sltda" "datagovlk")
+SOURCES=(
+  "booking" "agoda" "expedia"
+  "skyscanner" "rehlat" "traveloka" "tripadvisor" "tripcom" "goseek" "etrip" "hotelscom"
+  "sltda" "datagovlk"
+)
 CITIES=("Colombo" "Kandy" "Galle")
 FAILED=()
 SUCCESS=()
@@ -31,7 +34,6 @@ for source in "${SOURCES[@]}"; do
     echo "------------------------------------------"
 
     if [ "$source" == "sltda" ] || [ "$source" == "datagovlk" ]; then
-        # Government sources don't need city
         if $PYTHON -m src.main scrape --source "$source" --storage database; then
             SUCCESS+=("$source")
             echo "✓ $source completed"
@@ -40,7 +42,6 @@ for source in "${SOURCES[@]}"; do
             echo "✗ $source failed"
         fi
     else
-        # Travel sites - scrape multiple cities
         for city in "${CITIES[@]}"; do
             echo ""
             echo "City: $city"
@@ -58,9 +59,12 @@ for source in "${SOURCES[@]}"; do
         SUCCESS+=("$source")
     fi
 
-    # Rate limiting between sources
     sleep 10
 done
+
+echo ""
+echo "Purging unknown/junk records..."
+$PYTHON -m src.main --storage database purge-unknown || true
 
 echo ""
 echo "=========================================="

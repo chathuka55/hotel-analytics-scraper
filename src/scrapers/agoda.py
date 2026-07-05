@@ -1,28 +1,21 @@
 """Agoda.com scraper implementation."""
 
-import json
-import time
-from datetime import date, timedelta
+from datetime import date
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote_plus
 
-from bs4 import BeautifulSoup
-
 from src.config.settings import get_settings
-from src.monitoring.logger import get_logger
-from src.scrapers.base import BaseScraper
+from src.scrapers.travel import TravelSiteScraper
 from src.storage.base import BaseStorage
+from src.utils.city_ids import AGODA_CITY_IDS, lookup_city_id
 from src.utils.proxies import ProxyRotator
 
-logger = get_logger(__name__)
 
+class AgodaScraper(TravelSiteScraper):
+    """Scraper for Agoda.com hotel data."""
 
-class AgodaScraper(BaseScraper):
-    """Scraper for Agoda.com hotel data.
-
-    Agoda uses heavy JavaScript rendering, so Playwright
-    is often required for reliable scraping.
-    """
+    playwright_default = True
+    page_size = 25
 
     def __init__(
         self,
@@ -40,25 +33,12 @@ class AgodaScraper(BaseScraper):
         adults: int = 2,
         children: int = 0,
         rooms: int = 1,
-        page: int = 1,
+        offset: int = 0,
+        **kwargs,
     ) -> str:
-        """Build Agoda search URL.
-
-        Args:
-            city: Destination city
-            checkin_date: Check-in date
-            checkout_date: Check-out date
-            adults: Number of adults
-            children: Number of children
-            rooms: Number of rooms
-            page: Page number
-
-        Returns:
-            Complete search URL
-        """
         date_fmt = "%Y-%m-%d"
-        params = {
-            "city": city,
+        page = (offset // self.page_size) + 1
+        params: Dict[str, Any] = {
             "checkIn": checkin_date.strftime(date_fmt),
             "checkOut": checkout_date.strftime(date_fmt),
             "adults": adults,
@@ -67,75 +47,46 @@ class AgodaScraper(BaseScraper):
             "page": page,
         }
 
+        city_id = self.get_city_id(city)
+        if city_id:
+            params["cityId"] = city_id
+        else:
+            params["city"] = city
+
         query = "&".join(f"{k}={quote_plus(str(v))}" for k, v in params.items())
         return f"{self.base_url}/search?{query}"
 
-    def scrape(
+    def enrich_results(
         self,
+        results: List[Dict[str, Any]],
         city: str,
         checkin_date: date,
         checkout_date: date,
-        max_pages: int = 5,
-        use_playwright: bool = True,
-        **kwargs,
     ) -> List[Dict[str, Any]]:
-        """Scrape Agoda for hotel data.
+        """Fill missing prices via Agoda API when HTML parse is sparse."""
+        if results and all(r.get("nightly_rate") for r in results):
+            return results
 
-        Args:
-            city: City to search
-            checkin_date: Check-in date
-            checkout_date: Check-out date
-            max_pages: Maximum pages to scrape
-            use_playwright: Use browser (recommended for Agoda)
-            **kwargs: Additional parameters
+        city_id = self.get_city_id(city)
+        if not city_id:
+            return results
 
-        Returns:
-            List of hotel records
-        """
-        all_results = []
+        api_rows = self.scrape_api_fallback(city_id, checkin_date, checkout_date)
+        if not api_rows:
+            return results
 
-        self.logger.info(
-            f"Starting Agoda scrape: {city}, "
-            f"{checkin_date} to {checkout_date}"
-        )
-
-        for page in range(1, max_pages + 1):
-            self.logger.info(f"Fetching page {page}/{max_pages}")
-
-            url = self.build_search_url(
-                city, checkin_date, checkout_date, page=page
-            )
-
-            try:
-                if use_playwright:
-                    html = self.fetch_page_playwright(
-                        url, wait_for=".PropertyCard", timeout=45000
-                    )
-                else:
-                    html = self.fetch_page(url)
-
-                results = self.parse_results(
-                    html, city, checkin_date, checkout_date
-                )
-
-                if not results:
-                    self.logger.info("No more results found")
-                    break
-
-                all_results.extend(results)
-                self.logger.info(f"Page {page}: Found {len(results)} hotels")
-
-                time.sleep(2)
-
-            except Exception as e:
-                self.logger.error(f"Error on page {page}: {e}")
-                break
-
-        if all_results:
-            self.save_results(all_results)
-
-        self.logger.info(f"Agoda scrape complete: {len(all_results)} hotels")
-        return all_results
+        api_by_name = {
+            (r.get("hotel_name") or "").lower(): r for r in api_rows
+        }
+        for row in results:
+            key = (row.get("hotel_name") or "").lower()
+            if key in api_by_name:
+                extra = api_by_name[key]
+                row.setdefault("nightly_rate", extra.get("nightly_rate", 0))
+                row.setdefault("currency", extra.get("currency", "USD"))
+                if extra.get("city"):
+                    row["city"] = extra["city"]
+        return results
 
     def scrape_api_fallback(
         self,
@@ -143,21 +94,8 @@ class AgodaScraper(BaseScraper):
         checkin_date: date,
         checkout_date: date,
     ) -> List[Dict[str, Any]]:
-        """Attempt to use Agoda's internal API for data.
-
-        This requires capturing API calls from the browser.
-        Useful when HTML scraping is blocked.
-
-        Args:
-            city_id: Agoda city ID
-            checkin_date: Check-in date
-            checkout_date: Check-out date
-
-        Returns:
-            List of hotel records
-        """
+        """Use Agoda's internal API when HTML scraping is incomplete."""
         api_url = f"{self.base_url}/api/cronos/property/BatchSearch"
-
         payload = {
             "cityId": city_id,
             "checkIn": checkin_date.strftime("%Y-%m-%d"),
@@ -173,124 +111,47 @@ class AgodaScraper(BaseScraper):
                 json=payload,
                 headers={"Content-Type": "application/json"},
             )
-
             if response.status_code == 200:
-                data = response.json()
-                return self._parse_api_response(data)
-            else:
-                logger.warning(f"API returned {response.status_code}")
-                return []
-
+                return self._parse_api_response(response.json())
         except Exception as e:
-            logger.error(f"API fallback failed: {e}")
-            return []
+            self.logger.debug(f"Agoda API fallback failed: {e}")
+        return []
 
     def _parse_api_response(self, data: Dict) -> List[Dict[str, Any]]:
-        """Parse Agoda API response.
-
-        Args:
-            data: API response JSON
-
-        Returns:
-            List of hotel records
-        """
         results = []
-
         properties = data.get("results", {}).get("hotelResults", [])
         for prop in properties:
             try:
+                from src.utils.location import normalize_city
+
                 hotel = {
                     "source": "agoda",
                     "hotel_name": prop.get("hotelName", ""),
-                    "city": prop.get("cityName", ""),
+                    "city": normalize_city(prop.get("cityName", "")),
                     "country": prop.get("countryName", "Sri Lanka"),
                     "guest_score": prop.get("reviewScore", 0) / 10,
                     "review_count": prop.get("reviewCount", 0),
-                    "nightly_rate": prop.get("priceDetail", {})
-                    .get("displayPrice", 0),
-                    "currency": prop.get("priceDetail", {})
-                    .get("currency", "USD"),
+                    "nightly_rate": prop.get("priceDetail", {}).get(
+                        "displayPrice", 0
+                    ),
+                    "currency": prop.get("priceDetail", {}).get(
+                        "currency", "USD"
+                    ),
                     "url": f"{self.base_url}{prop.get('hotelUrl', '')}",
+                    "address": prop.get("address", ""),
                 }
+                if hotel["address"]:
+                    from src.utils.location import extract_city_from_location
+
+                    parsed = extract_city_from_location(
+                        hotel["address"], hotel["city"]
+                    )
+                    if parsed:
+                        hotel["city"] = parsed
                 results.append(hotel)
             except Exception as e:
-                logger.debug(f"Failed to parse API property: {e}")
-                continue
-
+                self.logger.debug(f"Failed to parse Agoda API property: {e}")
         return results
 
     def get_city_id(self, city_name: str) -> Optional[str]:
-        """Get Agoda city ID from city name.
-
-        Args:
-            city_name: City name
-
-        Returns:
-            City ID string or None
-        """
-        # Common Sri Lankan city IDs
-        city_ids = {
-            "colombo": "14932",
-            "kandy": "4919",
-            "galle": "21674",
-            "negombo": "13409",
-            "nuwara eliya": "21676",
-            "bentota": "14781",
-            "sigiriya": "16056",
-            "ella": "13418",
-            "mirissa": "21354",
-            "trincomalee": "14782",
-            "jaffna": "13424",
-            "anuradhapura": "16058",
-            "dambulla": "13413",
-            "hikkaduwa": "16060",
-            "unawatuna": "14783",
-        }
-
-        city_key = city_name.lower().strip()
-        return city_ids.get(city_key)
-
-    def scrape_with_monthly_dates(
-        self,
-        city: str,
-        year: int,
-        month: int,
-        max_pages: int = 3,
-    ) -> List[Dict[str, Any]]:
-        """Scrape Agoda for a specific month.
-
-        Args:
-            city: City name
-            year: Year
-            month: Month (1-12)
-            max_pages: Max pages per scrape
-
-        Returns:
-            Combined results
-        """
-        from calendar import monthrange
-
-        _, last_day = monthrange(year, month)
-        all_results = []
-
-        for day in range(1, min(last_day + 1, 8)):
-            checkin = date(year, month, day)
-            checkout = date(year, month, min(day + 1, last_day))
-
-            self.logger.info(f"Agoda: Scraping check-in {checkin}")
-
-            try:
-                results = self.scrape(
-                    city=city,
-                    checkin_date=checkin,
-                    checkout_date=checkout,
-                    max_pages=max_pages,
-                    use_playwright=True,
-                )
-                all_results.extend(results)
-                time.sleep(3)
-            except Exception as e:
-                self.logger.error(f"Agoda error on {checkin}: {e}")
-                continue
-
-        return all_results
+        return lookup_city_id(AGODA_CITY_IDS, city_name)
