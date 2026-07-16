@@ -23,16 +23,72 @@ function App() {
   const [tab, setTab] = useState<TabId>('overview')
   const [cities, setCities] = useState<string[]>([])
   const [city, setCity] = useState('')
+  const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => {
     api.getCities().then(setCities).catch(() => {})
   }, [])
 
+  useEffect(() => {
+    if (!menuOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuOpen(false)
+    }
+    document.addEventListener('keydown', onKey)
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = ''
+    }
+  }, [menuOpen])
+
   const active = TABS.find((t) => t.id === tab)!
 
+  function selectTab(id: TabId) {
+    setTab(id)
+    setMenuOpen(false)
+  }
+
   return (
-    <div className="app">
-      <aside className="sidebar">
+    <div className={`app ${menuOpen ? 'menu-open' : ''}`}>
+      <header className="mobile-topbar">
+        <button
+          type="button"
+          className="hamburger"
+          aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+          aria-expanded={menuOpen}
+          aria-controls="app-sidebar"
+          onClick={() => setMenuOpen((o) => !o)}
+        >
+          <span className={menuOpen ? 'is-open' : ''} />
+        </button>
+        <div className="mobile-brand">
+          <span className="brand-logo">⛱</span>
+          <b>HotelScope</b>
+        </div>
+        {tab !== 'scrape' && (
+          <label className="field mobile-city">
+            <span className="sr-only">City filter</span>
+            <select value={city} onChange={(e) => setCity(e.target.value)} aria-label="City filter">
+              <option value="">All cities</option>
+              {cities.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </label>
+        )}
+      </header>
+
+      {menuOpen && (
+        <button
+          type="button"
+          className="sidebar-backdrop"
+          aria-label="Close menu"
+          onClick={() => setMenuOpen(false)}
+        />
+      )}
+
+      <aside id="app-sidebar" className={`sidebar ${menuOpen ? 'open' : ''}`}>
         <div className="brand">
           <span className="brand-logo">⛱</span>
           <span className="brand-text">
@@ -41,22 +97,29 @@ function App() {
           </span>
         </div>
 
-        {TABS.map((t) => (
-          <button key={t.id} className={`nav-item ${tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>
-            <span className="ico">{t.icon}</span>
-            {t.label}
-          </button>
-        ))}
+        <nav className="sidebar-nav" aria-label="Main">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              className={`nav-item ${tab === t.id ? 'active' : ''}`}
+              onClick={() => selectTab(t.id)}
+            >
+              <span className="ico">{t.icon}</span>
+              {t.label}
+            </button>
+          ))}
+        </nav>
       </aside>
 
       <main className="content">
         <div className="page-head">
-          <div>
+          <div className="page-head-title">
             <h1>{active.label}</h1>
             <div className="sub">{active.sub}</div>
           </div>
           {tab !== 'scrape' && (
-            <label className="field" style={{ minWidth: 180 }}>
+            <label className="field desktop-city">
               City filter
               <select value={city} onChange={(e) => setCity(e.target.value)}>
                 <option value="">All cities</option>

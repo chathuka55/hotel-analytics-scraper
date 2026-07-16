@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import {
   Bar,
   BarChart,
@@ -136,24 +136,26 @@ export function OverviewView({ city }: { city: string }) {
           {sourceData.length === 0 ? (
             <Empty />
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-              <ResponsiveContainer width="55%" height={220}>
-                <PieChart>
-                  <Pie data={sourceData} dataKey="value" nameKey="name" innerRadius={52} outerRadius={88} paddingAngle={3} stroke="none">
-                    {sourceData.map((s) => (
-                      <Cell key={s.name} fill={SOURCE_COLORS[s.name] ?? '#94a3c4'} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{ background: '#18223b', border: '1px solid #243150', borderRadius: 10, color: '#e7ecf6' }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div className="chart-split">
+              <div className="chart-split-plot">
+                <ResponsiveContainer width="100%" height={220}>
+                  <PieChart>
+                    <Pie data={sourceData} dataKey="value" nameKey="name" innerRadius={52} outerRadius={88} paddingAngle={3} stroke="none">
+                      {sourceData.map((s) => (
+                        <Cell key={s.name} fill={SOURCE_COLORS[s.name] ?? '#94a3c4'} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{ background: '#18223b', border: '1px solid #243150', borderRadius: 10, color: '#e7ecf6' }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="chart-legend">
                 {sourceData.map((s) => (
-                  <div key={s.name} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
-                    <span style={{ width: 11, height: 11, borderRadius: 3, background: SOURCE_COLORS[s.name] ?? '#94a3c4' }} />
-                    <span style={{ flex: 1, textTransform: 'capitalize' }}>{s.name}</span>
+                  <div key={s.name} className="chart-legend-row">
+                    <span className="chart-legend-swatch" style={{ background: SOURCE_COLORS[s.name] ?? '#94a3c4' }} />
+                    <span className="chart-legend-name">{s.name}</span>
                     <b>{s.value}</b>
                   </div>
                 ))}
@@ -177,7 +179,7 @@ function Kpi({ label, value, meta, icon }: { label: string; value: string; meta:
   )
 }
 
-type Stat = { label: string; value?: string; node?: React.ReactNode }
+type Stat = { label: string; value?: string; node?: ReactNode }
 function Highlight({ cls, tag, name, sub, stats }: { cls: string; tag: string; name: string; sub: string; stats: Stat[] }) {
   return (
     <div className={`highlight ${cls}`}>

@@ -108,9 +108,9 @@ export function ScrapeTriggerView({ city: globalCity }: { city: string }) {
           </label>
           <label className="field">
             Max pages
-            <input type="number" min={1} max={20} value={maxPages} onChange={(e) => setMaxPages(Number(e.target.value))} style={{ width: 80 }} />
+            <input type="number" min={1} max={20} value={maxPages} onChange={(e) => setMaxPages(Number(e.target.value))} />
           </label>
-          <button type="submit" disabled={submitting || status?.status === 'started'}>
+          <button type="submit" className="form-submit" disabled={submitting || status?.status === 'started'}>
             {submitting || status?.status === 'started' ? 'Running…' : 'Run scrape'}
           </button>
         </form>
@@ -136,10 +136,10 @@ export function ScrapeTriggerView({ city: globalCity }: { city: string }) {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {history.map((j) => (
-              <div key={j.id} style={{ display: 'flex', alignItems: 'center', gap: 10, paddingBottom: 10, borderBottom: '1px solid var(--border-soft)' }}>
+              <div key={j.id} className="job-history-row">
                 <SourceBadge source={j.source} />
-                <span style={{ flex: 1 }} className="muted">{j.city || '—'}</span>
-                <span style={{ fontSize: 12 }}>{j.records_scraped} rec</span>
+                <span className="muted job-history-city">{j.city || '—'}</span>
+                <span className="job-history-meta">{j.records_scraped} rec</span>
                 <span className="badge" style={{ color: STATUS_COLOR[j.status] }}>{j.status}</span>
               </div>
             ))}

@@ -16,7 +16,7 @@ const STATUS_COLOR: Record<string, string> = {
   success: 'var(--accent)',
   failed: 'var(--danger)',
   started: 'var(--warn)',
-  never: 'var(--muted)',
+  never: 'var(--text-dim)',
 }
 
 export function LastScrapedPanel({ compact = false }: { compact?: boolean }) {
