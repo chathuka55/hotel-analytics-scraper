@@ -1,9 +1,23 @@
-"""Vercel Python entrypoint for the FastAPI app.
+"""Vercel Python entrypoint for the FastAPI app + dashboard static files."""
 
-Vercel routes /api/* to this module. The FastAPI routes already use the
-/api prefix, so the browser URLs match production paths.
-"""
+from pathlib import Path
+
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from src.api.main import app
+
+STATIC_DIR = Path(__file__).resolve().parent / "static"
+
+
+if STATIC_DIR.is_dir():
+    assets_dir = STATIC_DIR / "assets"
+    if assets_dir.is_dir():
+        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+
+    @app.get("/")
+    async def spa_index():
+        return FileResponse(STATIC_DIR / "index.html")
+
 
 __all__ = ["app"]

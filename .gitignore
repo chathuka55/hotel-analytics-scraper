@@ -94,3 +94,5 @@ frontend/dist/
 
 # --- Vercel static export (built from frontend/dist) ---
 /public/
+/api/static/
+.vercel
