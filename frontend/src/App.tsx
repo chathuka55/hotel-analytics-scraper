@@ -30,6 +30,16 @@ function App() {
   }, [])
 
   useEffect(() => {
+    const onResize = () => {
+      if (window.matchMedia('(min-width: 901px)').matches) {
+        setMenuOpen(false)
+      }
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  useEffect(() => {
     if (!menuOpen) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setMenuOpen(false)
@@ -51,34 +61,6 @@ function App() {
 
   return (
     <div className={`app ${menuOpen ? 'menu-open' : ''}`}>
-      <header className="mobile-topbar">
-        <button
-          type="button"
-          className="hamburger"
-          aria-label={menuOpen ? 'Close menu' : 'Open menu'}
-          aria-expanded={menuOpen}
-          aria-controls="app-sidebar"
-          onClick={() => setMenuOpen((o) => !o)}
-        >
-          <span className={menuOpen ? 'is-open' : ''} />
-        </button>
-        <div className="mobile-brand">
-          <span className="brand-logo">⛱</span>
-          <b>HotelScope</b>
-        </div>
-        {tab !== 'scrape' && (
-          <label className="field mobile-city">
-            <span className="sr-only">City filter</span>
-            <select value={city} onChange={(e) => setCity(e.target.value)} aria-label="City filter">
-              <option value="">All cities</option>
-              {cities.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          </label>
-        )}
-      </header>
-
       {menuOpen && (
         <button
           type="button"
@@ -112,16 +94,26 @@ function App() {
         </nav>
       </aside>
 
-      <main className="content">
-        <div className="page-head">
-          <div className="page-head-title">
-            <h1>{active.label}</h1>
-            <div className="sub">{active.sub}</div>
+      <div className="main-shell">
+        <header className="mobile-topbar">
+          <button
+            type="button"
+            className="hamburger"
+            aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={menuOpen}
+            aria-controls="app-sidebar"
+            onClick={() => setMenuOpen((o) => !o)}
+          >
+            <span className={menuOpen ? 'is-open' : ''} />
+          </button>
+          <div className="mobile-brand">
+            <span className="brand-logo">⛱</span>
+            <b>HotelScope</b>
           </div>
           {tab !== 'scrape' && (
-            <label className="field desktop-city">
-              City filter
-              <select value={city} onChange={(e) => setCity(e.target.value)}>
+            <label className="field mobile-city">
+              <span className="sr-only">City filter</span>
+              <select value={city} onChange={(e) => setCity(e.target.value)} aria-label="City filter">
                 <option value="">All cities</option>
                 {cities.map((c) => (
                   <option key={c} value={c}>{c}</option>
@@ -129,18 +121,38 @@ function App() {
               </select>
             </label>
           )}
-          <LastScrapedPanel compact />
-        </div>
+        </header>
 
-        {tab === 'overview' && <LastScrapedPanel />}
+        <main className="content">
+          <div className="page-head">
+            <div className="page-head-title">
+              <h1>{active.label}</h1>
+              <div className="sub">{active.sub}</div>
+            </div>
+            {tab !== 'scrape' && (
+              <label className="field desktop-city">
+                City filter
+                <select value={city} onChange={(e) => setCity(e.target.value)}>
+                  <option value="">All cities</option>
+                  {cities.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <LastScrapedPanel compact />
+          </div>
 
-        {tab === 'overview' && <OverviewView city={city} />}
-        {tab === 'top' && <TopHotelsView city={city} />}
-        {tab === 'price' && <PriceRatingsView city={city} />}
-        {tab === 'monthly' && <MonthlyTrendsView city={city} />}
-        {tab === 'browse' && <HotelBrowserView city={city} />}
-        {tab === 'scrape' && <ScrapeTriggerView city={city} />}
-      </main>
+          {tab === 'overview' && <LastScrapedPanel />}
+
+          {tab === 'overview' && <OverviewView city={city} />}
+          {tab === 'top' && <TopHotelsView city={city} />}
+          {tab === 'price' && <PriceRatingsView city={city} />}
+          {tab === 'monthly' && <MonthlyTrendsView city={city} />}
+          {tab === 'browse' && <HotelBrowserView city={city} />}
+          {tab === 'scrape' && <ScrapeTriggerView city={city} />}
+        </main>
+      </div>
     </div>
   )
 }
