@@ -118,3 +118,7 @@ warn_return_any = true
 warn_unused_ignores = true
 disallow_untyped_defs = true
 ignore_missing_imports = true
+
+# --- Vercel (FastAPI + static dashboard) ---
+[tool.vercel]
+entrypoint = "api.index:app"

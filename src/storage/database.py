@@ -1,5 +1,6 @@
 """Database storage using SQLAlchemy with SQLite and PostgreSQL support."""
 
+import os
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -117,6 +118,16 @@ class DatabaseStorage(BaseStorage):
         """
         settings = get_settings()
         self.database_url = database_url or settings.database.database_url
+
+        # Render/Railway often provide postgres://; SQLAlchemy expects postgresql://
+        if self.database_url.startswith("postgres://"):
+            self.database_url = self.database_url.replace(
+                "postgres://", "postgresql://", 1
+            )
+
+        # Vercel serverless filesystem is read-only except /tmp
+        if os.environ.get("VERCEL") and "sqlite" in self.database_url:
+            self.database_url = "sqlite:////tmp/hotel_scraper.db"
 
         # Ensure directory exists for SQLite
         if "sqlite" in self.database_url:

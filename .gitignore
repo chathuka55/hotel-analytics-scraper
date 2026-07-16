@@ -91,3 +91,6 @@ Thumbs.db
 node_modules/
 frontend/dist/
 *.local
+
+# --- Vercel static export (built from frontend/dist) ---
+/public/

@@ -14,6 +14,26 @@ from src.monitoring.logger import get_logger
 settings = get_settings()
 logger = get_logger(__name__)
 
+
+def _cors_origins() -> list[str]:
+    """Local + configured + production Vercel origins."""
+    configured = [
+        o.strip()
+        for o in (settings.api.frontend_origin or "").split(",")
+        if o.strip()
+    ]
+    defaults = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "https://hotel-analytics-scraper.vercel.app",
+    ]
+    origins: list[str] = []
+    for origin in configured + defaults:
+        if origin not in origins:
+            origins.append(origin)
+    return origins
+
+
 app = FastAPI(
     title="Hotel Scraper API",
     description="Exposes scraped Sri Lanka hotel check-in data to the React frontend.",
@@ -22,7 +42,8 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.api.frontend_origin],
+    allow_origins=_cors_origins(),
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_methods=["*"],
     allow_headers=["*"],
 )

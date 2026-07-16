@@ -1,0 +1,21 @@
+# Slim dependency set for Vercel (API + seeded dashboard data).
+# Full scraping stack stays in requirements.txt for local/Docker/CI.
+fastapi>=0.109.0
+uvicorn>=0.25.0
+sqlalchemy>=2.0.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+python-dotenv>=1.0.0
+pyyaml>=6.0.1
+loguru>=0.7.0
+pandas>=2.1.0
+numpy>=1.26.0
+aiosqlite>=0.19.0
+httpx2>=2.0.0
+tenacity>=8.2.0
+fake-useragent>=1.4.0
+click>=8.1.0
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+python-dateutil>=2.9.0

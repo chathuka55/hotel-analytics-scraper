@@ -1,4 +1,7 @@
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
+// Local Vite dev talks to the API on :8000. Production (Vercel) uses same-origin /api.
+const BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ??
+  (import.meta.env.DEV ? 'http://localhost:8000' : '')
 
 export interface TopHotel {
   hotel_name: string
