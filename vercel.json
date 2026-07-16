@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "fastapi",
   "installCommand": "pip install -r requirements-vercel.txt && cd frontend && npm install",
-  "buildCommand": "bash scripts/vercel_build.sh",
+  "buildCommand": "python scripts/vercel_build.py",
   "rewrites": [
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
