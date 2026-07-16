@@ -3,9 +3,6 @@
   "framework": "fastapi",
   "installCommand": "pip install -r requirements-vercel.txt && cd frontend && npm install",
   "buildCommand": "python scripts/vercel_build.py",
-  "rewrites": [
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
-  ],
   "functions": {
     "api/index.py": {
       "maxDuration": 60,

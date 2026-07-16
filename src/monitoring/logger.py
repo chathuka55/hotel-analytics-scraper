@@ -68,19 +68,22 @@ def configure_logging(
             enqueue=True,
         )
     else:
-        # Default log file
-        log_dir = Path("logs")
-        log_dir.mkdir(exist_ok=True)
-        logger.add(
-            str(log_dir / "scraper_{time:YYYY-MM-DD}.log"),
-            level=level,
-            format=DETAILED_FORMAT,
-            serialize=serialize,
-            rotation="10 MB",
-            retention="30 days",
-            compression="zip",
-            enqueue=True,
-        )
+        # Default log file (skip on Vercel — filesystem is ephemeral/read-only)
+        import os
+
+        if not os.environ.get("VERCEL"):
+            log_dir = Path("logs")
+            log_dir.mkdir(exist_ok=True)
+            logger.add(
+                str(log_dir / "scraper_{time:YYYY-MM-DD}.log"),
+                level=level,
+                format=DETAILED_FORMAT,
+                serialize=serialize,
+                rotation="10 MB",
+                retention="30 days",
+                compression="zip",
+                enqueue=True,
+            )
 
     logger.info(f"Logging configured with level={level}")
 
